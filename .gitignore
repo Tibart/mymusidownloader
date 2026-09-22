@@ -1,0 +1,8 @@
+download/
+bin/
+*.exe
+*.test
+.vscode/
+.idea/
+*.swp
+*~
