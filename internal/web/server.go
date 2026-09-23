@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"mymusidownloader/internal/track"
+	"mymusidownloader/internal/version"
 )
 
 type App interface {
@@ -67,7 +68,8 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		Refresh bool
 		Now     time.Time
 		Notice  string
-	}{Tracks: tracks, Refresh: refresh, Now: time.Now(), Notice: noticeFromQuery(r)}
+		Version string
+	}{Tracks: tracks, Refresh: refresh, Now: time.Now(), Notice: noticeFromQuery(r), Version: version.Current}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.tmpl.Execute(w, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -333,6 +335,7 @@ const pageTemplate = `<!doctype html>
     form { margin: 0; }
     .actions form { display: inline-block; margin-right: 0.25rem; }
     .error { color: #900; }
+    footer { margin-top: 2rem; color: #666; font-size: 0.85rem; }
   </style>
 </head>
 <body>
@@ -396,6 +399,7 @@ const pageTemplate = `<!doctype html>
       {{end}}
     </tbody>
   </table>
+  <footer>mymusidownloader {{.Version}}</footer>
 </body>
 </html>
 `

@@ -134,7 +134,7 @@ func (t FFmpegMediaTool) ConvertToOpus(ctx context.Context, inputPath, outputPat
 func (t FFmpegMediaTool) PrepareArtwork(ctx context.Context, inputPath, outputPath string) error {
 	return runFFmpeg(ctx, t.FFmpegPath,
 		"-y", "-i", inputPath,
-		"-vf", "crop='min(iw,ih)':'min(iw,ih)',scale='min(1400,iw)':-1:flags=lanczos",
+		"-vf", "crop='min(iw,ih)':'min(iw,ih)',scale='min(1024,iw)':-1:flags=lanczos",
 		"-q:v", "3",
 		outputPath,
 	)
@@ -150,6 +150,9 @@ func (t FFmpegMediaTool) WriteTags(ctx context.Context, path string, tags track.
 	tags = mergeProbe(tags, t.probe(ctx, path))
 	artwork, cleanup := t.labeledArtwork(ctx, tags)
 	defer cleanup()
+	if !containerSupportsArtwork(ext) {
+		artwork = ""
+	}
 	args := append(mediaInputs(path, artwork), "-c:a", "copy")
 	args = append(args, artworkCodecArgs(artwork)...)
 	args = append(args, metadataArgs(tags)...)
@@ -417,13 +420,24 @@ func drawtextLiteral(text string) string {
 }
 
 func mediaInputs(audioPath, artworkPath string) []string {
-	args := []string{"-y", "-i", audioPath, "-map", "0:a"}
+	args := []string{"-y", "-i", audioPath}
+	maps := []string{"-map", "0:a"}
 	if artworkPath != "" {
 		if _, err := os.Stat(artworkPath); err == nil {
-			return append(args, "-i", artworkPath, "-map", "1:v")
+			args = append(args, "-i", artworkPath)
+			maps = append(maps, "-map", "1:v")
 		}
 	}
-	return args
+	return append(args, maps...)
+}
+
+func containerSupportsArtwork(ext string) bool {
+	switch strings.ToLower(strings.TrimPrefix(ext, ".")) {
+	case "m4a", "mp4", "mp3":
+		return true
+	default:
+		return false
+	}
 }
 
 func artworkCodecArgs(artworkPath string) []string {

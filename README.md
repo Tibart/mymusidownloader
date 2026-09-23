@@ -12,7 +12,7 @@ Audio files go in `libraryPath`. JSON metadata files go in `metadataPath`. Those
 
 The download starts under a temporary video-id name, then is renamed to `{YYYY-MM-DD}_{PascalTitle}.{ext}`. The date is the day the download started. If that name exists, the video id is appended.
 
-MP3, AAC, FLAC, ALAC, and Opus are kept as downloaded. The YouTube thumbnail is center-cropped to a square and saved as album art, at most 1400 by 1400 pixels. When the album name is known, it is drawn on a dark bar at the bottom so it stays readable on a phone. Opus is kept as `.opus`. Most iOS Navidrome apps cannot play that. `POST /tracks/{videoId}/convert` starts an equivalent AAC conversion in the background and returns immediately with state `converting`. Opus 96 becomes AAC 128, Opus 128 becomes AAC 160, and Opus 160 becomes AAC 192. Same-bitrate conversion is rejected. Save is disabled while a track is converting. Any other codec is converted once to Opus, and only when the source bitrate is known. Tag edits do not encode the audio again.
+MP3, AAC, FLAC, ALAC, and Opus are kept as downloaded. The YouTube thumbnail is center-cropped to a square and saved as album art, at most 1024 by 1024 pixels. When the album name is known, it is drawn on a dark bar at the bottom so it stays readable on a phone. Opus is kept as `.opus`. Most iOS Navidrome apps cannot play that. `POST /tracks/{videoId}/convert` starts an equivalent AAC conversion in the background and returns immediately with state `converting`. Opus 96 becomes AAC 128, Opus 128 becomes AAC 160, and Opus 160 becomes AAC 192. Same-bitrate conversion is rejected. Save is disabled while a track is converting. Any other codec is converted once to Opus, and only when the source bitrate is known. Tag edits do not encode the audio again.
 
 ## Build
 
@@ -21,17 +21,12 @@ Needs Go 1.22 or newer. No third-party Go modules. `yt-dlp` and `ffmpeg` are ext
 From the repo root:
 
 ```sh
-go test ./...
-go build -o mymusidownloader ./cmd/mymusidownloader
+make test
+make build
+make build-arm64
 ```
 
-That binary is for the machine you built it on. The Pi needs a Linux arm64 binary, built on the dev machine:
-
-```sh
-GOOS=linux GOARCH=arm64 go build -o mymusidownloader ./cmd/mymusidownloader
-```
-
-Do not build on the Pi. Copy that file to `/usr/local/bin/mymusidownloader`.
+`make build` writes the binary for this machine to `bin/mymusidownloader`. `make build-arm64` writes the Pi binary to `bin/linux-arm64/mymusidownloader`. `bin/` is gitignored. Do not build on the Pi. Copy `bin/linux-arm64/mymusidownloader` to `/usr/local/bin/mymusidownloader`.
 
 ## Run locally
 
@@ -52,7 +47,7 @@ The service runs as the user `musi` on a Raspberry Pi 5. `musi` has no home dire
 
 Install ffmpeg from apt. Do not install Debian's `yt-dlp` package. Put the current upstream `linux_aarch64` binary at `/usr/local/bin/yt-dlp` and make it executable.
 
-Copy the arm64 binary from the build step to `/usr/local/bin/mymusidownloader`.
+Copy `bin/linux-arm64/mymusidownloader` to `/usr/local/bin/mymusidownloader`.
 
 Create the system user without a home directory, then the config directory:
 
@@ -73,7 +68,7 @@ systemctl enable --now mymusidownloader
 
 ## Config
 
-The process reads one JSON file, passed with `-config`. There are no environment variables.
+The process reads one JSON file, passed with `-config`. There are no environment variables. The JSON file does not set the user. systemd does that in `systemd/mymusidownloader.service` with `User=musi` and `Group=media`.
 
 | Field | Default | Meaning |
 | --- | --- | --- |
@@ -103,3 +98,22 @@ Pi config:
 `POST /trigger` with `{"url":"..."}` returns `videoId`, `state`, and `error` when rejected. The state is `rejected`, `stored`, `queued`, or `downloading`. The call returns when the download is accepted or started, not when the file is finished.
 
 `POST /tracks/{videoId}` saves title, artist, album, and genre. It is rejected while the track is queued, downloading, or converting. `POST /tracks/{videoId}/cancel` stops a queued or running download. `POST /tracks/{videoId}/restart` restarts a failed or cancelled track. `POST /tracks/{videoId}/convert` accepts only equivalent AAC conversion, sets state `converting`, and returns without waiting for ffmpeg. `POST /tracks/{videoId}/delete` removes the audio file, the JSON record, and the cover. It is rejected while the track is queued, downloading, or converting. There is no file download and no status API.
+
+Examples against the local daemon. On the Pi, use `http://pi:6874` instead of `http://127.0.0.1:6874`.
+
+```sh
+curl -sS -X POST http://127.0.0.1:6874/trigger \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ"}'
+
+curl -sS -X POST http://127.0.0.1:6874/tracks/dQw4w9WgXcQ \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Never Gonna Give You Up","artist":"Rick Astley","album":"","genre":"Pop"}'
+
+curl -sS -X POST http://127.0.0.1:6874/tracks/dQw4w9WgXcQ/cancel
+curl -sS -X POST http://127.0.0.1:6874/tracks/dQw4w9WgXcQ/restart
+curl -sS -X POST http://127.0.0.1:6874/tracks/dQw4w9WgXcQ/convert \
+  -H 'Content-Type: application/json' \
+  -d '{"equivalent":true}'
+curl -sS -X POST http://127.0.0.1:6874/tracks/dQw4w9WgXcQ/delete
+```

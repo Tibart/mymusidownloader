@@ -13,6 +13,7 @@ import (
 	"mymusidownloader/internal/config"
 	"mymusidownloader/internal/downloader"
 	"mymusidownloader/internal/track"
+	"mymusidownloader/internal/version"
 	"mymusidownloader/internal/web"
 )
 
@@ -61,7 +62,7 @@ func main() {
 		_ = httpServer.Shutdown(ctx)
 	}()
 
-	log.Printf("listening on http://%s", cfg.Address())
+	log.Printf("mymusidownloader %s listening on http://%s", version.Current, cfg.Address())
 	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("serve: %v", err)
 	}

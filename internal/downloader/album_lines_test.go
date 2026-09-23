@@ -1,6 +1,16 @@
 package downloader
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestMediaInputsPutMapsAfterInputs(t *testing.T) {
+	args := mediaInputs("audio.opus", "")
+	if strings.Join(args, " ") != "-y -i audio.opus -map 0:a" {
+		t.Fatalf("args = %v", args)
+	}
+}
 
 func TestAlbumLines(t *testing.T) {
 	short := albumLines("Rick Astley Live")
