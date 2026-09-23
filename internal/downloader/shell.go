@@ -41,6 +41,8 @@ func (d ShellDownloader) Download(ctx context.Context, url, library, videoID str
 	outputTemplate := filepath.Join(library, videoID+".%(ext)s")
 	cmd := exec.CommandContext(ctx, d.YTDLPPath,
 		"--no-playlist",
+		"--write-thumbnail",
+		"--convert-thumbnails", "jpg",
 		"-f", "bestaudio/best",
 		"-o", outputTemplate,
 		url,
@@ -73,6 +75,7 @@ func (d ShellDownloader) Download(ctx context.Context, url, library, videoID str
 		Channel:       channel,
 		UploadDate:    info.UploadDate,
 		DurationSec:   int(info.Duration),
+		ArtworkPath:   findThumbnail(library, videoID),
 	}, nil
 }
 
@@ -103,13 +106,12 @@ type FFmpegMediaTool struct {
 func (t FFmpegMediaTool) ConvertToAAC(ctx context.Context, inputPath, outputPath string, bitrateKbps int, tags track.Tags) error {
 	tags.Codec = "aac"
 	tags.BitrateKbps = bitrateKbps
-	args := append([]string{
-		"-y",
-		"-i", inputPath,
+	args := append(append(mediaInputs(inputPath, tags.ArtworkPath),
 		"-c:a", "aac",
 		"-b:a", fmt.Sprintf("%dk", bitrateKbps),
 		"-movflags", "+faststart",
-	}, metadataArgs(tags)...)
+	), metadataArgs(tags)...)
+	args = append(args, artworkCodecArgs(tags.ArtworkPath)...)
 	args = append(args, outputPath)
 	return runFFmpeg(ctx, t.FFmpegPath, args...)
 }
@@ -127,6 +129,15 @@ func (t FFmpegMediaTool) ConvertToOpus(ctx context.Context, inputPath, outputPat
 	return runFFmpeg(ctx, t.FFmpegPath, args...)
 }
 
+func (t FFmpegMediaTool) PrepareArtwork(ctx context.Context, inputPath, outputPath string) error {
+	return runFFmpeg(ctx, t.FFmpegPath,
+		"-y", "-i", inputPath,
+		"-vf", "crop='min(iw,ih)':'min(iw,ih)',scale='min(1400,iw)':-1:flags=lanczos",
+		"-q:v", "3",
+		outputPath,
+	)
+}
+
 func (t FFmpegMediaTool) Remux(ctx context.Context, inputPath, outputPath string) error {
 	return runFFmpeg(ctx, t.FFmpegPath, "-y", "-i", inputPath, "-map", "0:a", "-c", "copy", outputPath)
 }
@@ -135,12 +146,9 @@ func (t FFmpegMediaTool) WriteTags(ctx context.Context, path string, tags track.
 	ext := filepath.Ext(path)
 	tmpPath := filepath.Join(filepath.Dir(path), "."+strings.TrimSuffix(filepath.Base(path), ext)+".tagtmp"+ext)
 	tags = mergeProbe(tags, t.probe(ctx, path))
-	args := append([]string{
-		"-y",
-		"-i", path,
-		"-map", "0",
-		"-codec", "copy",
-	}, metadataArgs(tags)...)
+	args := append(mediaInputs(path, tags.ArtworkPath), "-c:a", "copy")
+	args = append(args, artworkCodecArgs(tags.ArtworkPath)...)
+	args = append(args, metadataArgs(tags)...)
 	args = append(args, tmpPath)
 	if err := runFFmpeg(ctx, t.FFmpegPath, args...); err != nil {
 		_ = os.Remove(tmpPath)
@@ -186,6 +194,7 @@ func metadataArgs(tags track.Tags) []string {
 		{"sample_rate", numberTag(tags.SampleRate)},
 		{"channels", numberTag(tags.Channels)},
 		{"source", tags.SourceURL},
+		{"copyright", tags.SourceURL},
 		{"comment", comment},
 		{"description", comment},
 	}
@@ -315,6 +324,36 @@ func bitrateKbps(info ytDLPInfo) int {
 	return 0
 }
 
+func findThumbnail(library, videoID string) string {
+	for _, ext := range []string{".jpg", ".jpeg", ".png", ".webp"} {
+		path := filepath.Join(library, videoID+ext)
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	return ""
+}
+
+func mediaInputs(audioPath, artworkPath string) []string {
+	args := []string{"-y", "-i", audioPath, "-map", "0:a"}
+	if artworkPath != "" {
+		if _, err := os.Stat(artworkPath); err == nil {
+			return append(args, "-i", artworkPath, "-map", "1:v")
+		}
+	}
+	return args
+}
+
+func artworkCodecArgs(artworkPath string) []string {
+	if artworkPath == "" {
+		return nil
+	}
+	if _, err := os.Stat(artworkPath); err != nil {
+		return nil
+	}
+	return []string{"-c:v", "mjpeg", "-disposition:v:0", "attached_pic"}
+}
+
 func findDownloadedFile(library, videoID string) (string, error) {
 	matches, err := filepath.Glob(filepath.Join(library, videoID+".*"))
 	if err != nil {
@@ -323,7 +362,8 @@ func findDownloadedFile(library, videoID string) (string, error) {
 	filtered := matches[:0]
 	for _, match := range matches {
 		base := filepath.Base(match)
-		if strings.HasSuffix(base, ".part") || strings.HasSuffix(base, ".ytdl") || strings.HasSuffix(base, ".json") {
+		ext := strings.ToLower(filepath.Ext(base))
+		if strings.HasSuffix(base, ".part") || strings.HasSuffix(base, ".ytdl") || strings.HasSuffix(base, ".json") || ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".webp" {
 			continue
 		}
 		filtered = append(filtered, match)

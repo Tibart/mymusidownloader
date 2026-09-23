@@ -12,7 +12,7 @@ Audio files go in `libraryPath`. JSON metadata files go in `metadataPath`. Those
 
 The download starts under a temporary video-id name, then is renamed to `{YYYY-MM-DD}_{PascalTitle}.{ext}`. The date is the day the download started. If that name exists, the video id is appended.
 
-MP3, AAC, FLAC, ALAC, and Opus are kept as downloaded. Opus is kept as `.opus`. Most iOS Navidrome apps cannot play that. `POST /tracks/{videoId}/convert` starts an equivalent AAC conversion in the background and returns immediately with state `converting`. Opus 96 becomes AAC 128, Opus 128 becomes AAC 160, and Opus 160 becomes AAC 192. Same-bitrate conversion is rejected. Save is disabled while a track is converting. Any other codec is converted once to Opus, and only when the source bitrate is known. Tag edits do not encode the audio again.
+MP3, AAC, FLAC, ALAC, and Opus are kept as downloaded. The YouTube thumbnail is center-cropped to a square and saved as album art, at most 1400 by 1400 pixels. Phone players show a square cover, and a wide thumbnail would leave bars or look soft. Opus is kept as `.opus`. Most iOS Navidrome apps cannot play that. `POST /tracks/{videoId}/convert` starts an equivalent AAC conversion in the background and returns immediately with state `converting`. Opus 96 becomes AAC 128, Opus 128 becomes AAC 160, and Opus 160 becomes AAC 192. Same-bitrate conversion is rejected. Save is disabled while a track is converting. Any other codec is converted once to Opus, and only when the source bitrate is known. Tag edits do not encode the audio again.
 
 ## Build
 

@@ -114,6 +114,10 @@ func (f *fakeMediaTool) ConvertToOpus(ctx context.Context, inputPath, outputPath
 	return os.WriteFile(outputPath, append([]byte("opus:"), data...), 0o644)
 }
 
+func (f *fakeMediaTool) PrepareArtwork(ctx context.Context, inputPath, outputPath string) error {
+	return f.Remux(ctx, inputPath, outputPath)
+}
+
 func (f *fakeMediaTool) Remux(ctx context.Context, inputPath, outputPath string) error {
 	data, err := os.ReadFile(inputPath)
 	if err != nil {

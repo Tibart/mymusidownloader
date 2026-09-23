@@ -80,6 +80,7 @@ type Tags struct {
 	DurationSec int
 	SampleRate  int
 	Channels    int
+	ArtworkPath string
 }
 
 func (t Track) Tags() Tags {

@@ -35,6 +35,7 @@ type DownloadedMedia struct {
 	DurationSec   int
 	SampleRate    int
 	Channels      int
+	ArtworkPath   string
 }
 
 type Downloader interface {
@@ -46,6 +47,7 @@ type MediaTool interface {
 	ConvertToAAC(ctx context.Context, inputPath, outputPath string, bitrateKbps int, tags Tags) error
 	WriteTags(ctx context.Context, path string, tags Tags) error
 	Remux(ctx context.Context, inputPath, outputPath string) error
+	PrepareArtwork(ctx context.Context, inputPath, outputPath string) error
 }
 
 type Service struct {
@@ -225,7 +227,7 @@ func (s *Service) Update(videoID, title, artist, genre, album string) (Track, er
 	s.mu.Unlock()
 
 	if path != "" {
-		if err := s.mediaTool.WriteTags(context.Background(), path, updated.Tags()); err != nil {
+		if err := s.mediaTool.WriteTags(context.Background(), path, s.tagsFor(&updated)); err != nil {
 			return Track{}, err
 		}
 	}
@@ -381,7 +383,28 @@ func (s *Service) captureMetadata(videoID string, mediaFile DownloadedMedia) (st
 	if err := s.store.Save(*tr); err != nil {
 		return "", Tags{}, time.Time{}, err
 	}
-	return tr.Title, tr.Tags(), tr.DownloadStartedAt, nil
+	tags := s.tagsFor(tr)
+	if mediaFile.ArtworkPath != "" {
+		dest := s.store.ArtworkPath(videoID)
+		if err := s.mediaTool.PrepareArtwork(context.Background(), mediaFile.ArtworkPath, dest); err != nil {
+			_ = os.Rename(mediaFile.ArtworkPath, dest)
+		} else if mediaFile.ArtworkPath != dest {
+			_ = os.Remove(mediaFile.ArtworkPath)
+		}
+		if _, err := os.Stat(dest); err == nil {
+			tags.ArtworkPath = dest
+		}
+	}
+	return tr.Title, tags, tr.DownloadStartedAt, nil
+}
+
+func (s *Service) tagsFor(tr *Track) Tags {
+	tags := tr.Tags()
+	art := s.store.ArtworkPath(tr.VideoID)
+	if _, err := os.Stat(art); err == nil {
+		tags.ArtworkPath = art
+	}
+	return tags
 }
 
 func (s *Service) markDone(videoID, finalName, storedCodec string) error {
@@ -559,7 +582,7 @@ func (s *Service) Convert(_ context.Context, videoID string, equivalent bool) (T
 		return Track{}, errUnknownBitrate
 	}
 	sourcePath := tr.AudioPath(s.library)
-	tags := tr.Tags()
+	tags := s.tagsFor(tr)
 	title := tr.Title
 	startedAt := tr.DownloadStartedAt
 	if startedAt.IsZero() {

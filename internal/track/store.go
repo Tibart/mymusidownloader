@@ -18,6 +18,10 @@ func NewFileStore(dir string) *FileStore {
 	return &FileStore{dir: dir}
 }
 
+func (s *FileStore) ArtworkPath(videoID string) string {
+	return filepath.Join(s.dir, videoID+".jpg")
+}
+
 func (s *FileStore) LoadAll() ([]Track, error) {
 	entries, err := os.ReadDir(s.dir)
 	if err != nil {
