@@ -34,23 +34,44 @@ func Parse(input string) (Target, error) {
 
 	host := strings.ToLower(u.Hostname())
 	switch host {
-	case "youtube.com", "www.youtube.com", "m.youtube.com":
+	case "youtu.be":
+		videoID := strings.Trim(strings.TrimPrefix(u.Path, "/"), "/")
+		if i := strings.Index(videoID, "/"); i >= 0 {
+			videoID = videoID[:i]
+		}
+		if !videoIDPattern.MatchString(videoID) {
+			return Target{}, errors.New("invalid video id")
+		}
+		return Target{VideoID: videoID, URL: WatchURL(videoID)}, nil
+	case "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com":
 	default:
 		return Target{}, errors.New("unsupported youtube host")
 	}
 
-	if u.Path != "/watch" {
-		return Target{}, errors.New("only youtube watch urls are accepted")
+	if u.Path == "/playlist" || strings.HasPrefix(u.Path, "/channel/") || strings.HasPrefix(u.Path, "/@") || u.Path == "/results" {
+		return Target{}, errors.New("only a single youtube video is accepted")
 	}
-	query := u.Query()
-	if query.Get("list") != "" {
-		return Target{}, errors.New("playlists are not accepted")
-	}
-	videoID := query.Get("v")
+	videoID := videoIDFromPath(u)
 	if !videoIDPattern.MatchString(videoID) {
-		return Target{}, errors.New("invalid video id")
+		return Target{}, errors.New("only a single youtube video is accepted")
 	}
 	return Target{VideoID: videoID, URL: WatchURL(videoID)}, nil
+}
+
+func videoIDFromPath(u *url.URL) string {
+	if u.Path == "/watch" {
+		return u.Query().Get("v")
+	}
+	for _, prefix := range []string{"/shorts/", "/embed/", "/live/", "/v/"} {
+		if strings.HasPrefix(u.Path, prefix) {
+			id := strings.Trim(strings.TrimPrefix(u.Path, prefix), "/")
+			if i := strings.Index(id, "/"); i >= 0 {
+				id = id[:i]
+			}
+			return id
+		}
+	}
+	return ""
 }
 
 func WatchURL(videoID string) string {

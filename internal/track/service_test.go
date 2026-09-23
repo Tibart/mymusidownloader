@@ -110,6 +110,14 @@ func (f *fakeMediaTool) ConvertToOpus(ctx context.Context, inputPath, outputPath
 	return os.WriteFile(outputPath, append([]byte("opus:"), data...), 0o644)
 }
 
+func (f *fakeMediaTool) Remux(ctx context.Context, inputPath, outputPath string) error {
+	data, err := os.ReadFile(inputPath)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(outputPath, data, 0o644)
+}
+
 func (f *fakeMediaTool) WriteTags(ctx context.Context, path string, tags Tags) error {
 	f.mu.Lock()
 	f.writeCalls = append(f.writeCalls, writeCall{path: path, tags: tags})
@@ -391,6 +399,7 @@ func TestServiceCancelRemovesPartialAndSetsCancelled(t *testing.T) {
 		return os.IsNotExist(err)
 	})
 	close(block)
+	waitIdle(t, service)
 }
 
 func TestServiceRestartOnlyFromFailedOrCancelled(t *testing.T) {
@@ -491,6 +500,7 @@ func TestServiceRestartOnlyFromFailedOrCancelled(t *testing.T) {
 				if cleanupBlock != nil {
 					close(cleanupBlock)
 				}
+				waitIdle(t, service)
 				return
 			}
 			if err != nil {
@@ -505,6 +515,7 @@ func TestServiceRestartOnlyFromFailedOrCancelled(t *testing.T) {
 			if cleanupBlock != nil {
 				close(cleanupBlock)
 			}
+			waitIdle(t, service)
 		})
 	}
 }
@@ -580,6 +591,15 @@ func TestServiceCancelDuringTagWriteStaysCancelled(t *testing.T) {
 			t.Fatalf("leftover audio file %s", entry.Name())
 		}
 	}
+}
+
+func waitIdle(t *testing.T, service *Service) {
+	t.Helper()
+	waitFor(t, func() bool {
+		service.mu.Lock()
+		defer service.mu.Unlock()
+		return service.active == 0 && len(service.running) == 0
+	})
 }
 
 func waitForState(t *testing.T, service *Service, videoID string, want State) {

@@ -5,9 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/home/musi/bin/mymusidownloader -config /home/musi/.config/mymusidownloader/config.json
+User=musi
+Group=media
+ExecStart=/usr/local/bin/mymusidownloader -config /etc/mymusidownloader/config.json
 Restart=on-failure
 RestartSec=5
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target

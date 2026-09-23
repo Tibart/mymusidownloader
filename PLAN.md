@@ -5,12 +5,12 @@ Personal Go daemon. Phone on Tailscale starts a YouTube audio download. File sta
 ## Run
 
 - Code: `/mnt/c/Repos/mymusidownloader`
-- Pi 5, user `musi`, group `media`, linger, systemd user service
-- Config: `/home/musi/.config/mymusidownloader/config.json`
-- Library setting on Pi: `/mnt/exthd/music`. Missing or not writable: exit, no SD fallback
+- Pi 5, user `musi`, no home directory, group `media`, systemd system service
+- Config: `/etc/mymusidownloader/config.json`
+- Library on Pi: `/mnt/exthd/mymusi/download`. Metadata: `/mnt/exthd/mymusi/data`. Either missing or not writable: exit, no SD fallback
 - Dev library default: `download/` in the repo
 - Listen: Tailscale address, else `127.0.0.1`. Port setting, default `6874`. No login
-- Binary: cross-compile `linux/arm64` here, copy to `/home/musi/bin/mymusidownloader`
+- Binary: cross-compile `linux/arm64` here, copy to `/usr/local/bin/mymusidownloader`
 - `yt-dlp`: upstream aarch64 binary at `/usr/local/bin/yt-dlp`. `ffmpeg` from apt
 
 ## Trigger
@@ -46,4 +46,4 @@ Personal Go daemon. Phone on Tailscale starts a YouTube audio download. File sta
 
 - Pi username spelling `musi` not confirmed on the machine
 - Tailscale hostname is `pi`
-- Group `media` and mount `/mnt/exthd/music` assumed to be created outside this repo
+- Group `media` and the directories `/mnt/exthd/mymusi/download` and `/mnt/exthd/mymusi/data` are created outside this repo

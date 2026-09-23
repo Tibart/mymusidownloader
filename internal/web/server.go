@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -63,7 +64,8 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		Tracks  []track.Track
 		Refresh bool
 		Now     time.Time
-	}{Tracks: tracks, Refresh: refresh, Now: time.Now()}
+		Notice  string
+	}{Tracks: tracks, Refresh: refresh, Now: time.Now(), Notice: noticeFromQuery(r)}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.tmpl.Execute(w, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -89,7 +91,7 @@ func (s *Server) handleTrigger(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, result)
 		return
 	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, noticeURL(string(result.State), result.VideoID, result.Error), http.StatusSeeOther)
 }
 
 func (s *Server) handleTrackAction(w http.ResponseWriter, r *http.Request) {
@@ -230,6 +232,38 @@ func writeJSON(w http.ResponseWriter, code int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
+func noticeURL(state, videoID, errText string) string {
+	q := url.Values{}
+	if state != "" {
+		q.Set("state", state)
+	}
+	if videoID != "" {
+		q.Set("videoId", videoID)
+	}
+	if errText != "" {
+		q.Set("error", errText)
+	}
+	if len(q) == 0 {
+		return "/"
+	}
+	return "/?" + q.Encode()
+}
+
+func noticeFromQuery(r *http.Request) string {
+	state := strings.TrimSpace(r.URL.Query().Get("state"))
+	if state == "" {
+		return ""
+	}
+	notice := state
+	if videoID := strings.TrimSpace(r.URL.Query().Get("videoId")); videoID != "" {
+		notice += " " + videoID
+	}
+	if errText := strings.TrimSpace(r.URL.Query().Get("error")); errText != "" {
+		notice += ": " + errText
+	}
+	return notice
+}
+
 const pageTemplate = `<!doctype html>
 <html lang="en">
 <head>
@@ -248,6 +282,7 @@ const pageTemplate = `<!doctype html>
 </head>
 <body>
   <h1>Recent page</h1>
+  {{if .Notice}}<p class="error">{{.Notice}}</p>{{end}}
   <form method="post" action="/trigger">
     <label for="url">YouTube watch URL or video id</label>
     <input id="url" type="text" name="url" required>
@@ -271,19 +306,18 @@ const pageTemplate = `<!doctype html>
       <tr>
         <td>{{formatDate .}}</td>
         <td>
-          <form method="post" action="/tracks/{{.VideoID}}">
-            <input type="text" name="title" value="{{.Title}}">
+          <form id="edit-{{.VideoID}}" method="post" action="/tracks/{{.VideoID}}"></form>
+          <input form="edit-{{.VideoID}}" type="text" name="title" value="{{.Title}}">
         </td>
-        <td><input type="text" name="artist" value="{{.Artist}}"></td>
-        <td><input type="text" name="genre" value="{{.Genre}}"></td>
+        <td><input form="edit-{{.VideoID}}" type="text" name="artist" value="{{.Artist}}"></td>
+        <td><input form="edit-{{.VideoID}}" type="text" name="genre" value="{{.Genre}}"></td>
         <td>
           {{.State}}
           {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
         </td>
         <td>{{.FileName}}</td>
         <td class="actions">
-            <button type="submit">Save</button>
-          </form>
+            <button form="edit-{{.VideoID}}" type="submit">Save</button>
           {{if or (eq .State "queued") (eq .State "downloading")}}
           <form method="post" action="/tracks/{{.VideoID}}/cancel"><button type="submit">Cancel</button></form>
           {{end}}

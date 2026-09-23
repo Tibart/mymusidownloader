@@ -1,5 +1,6 @@
 {
   "libraryPath": "./download",
+  "metadataPath": "./metadata",
   "port": 6874,
   "maxConcurrent": 2,
   "bind": "127.0.0.1",

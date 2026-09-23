@@ -11,24 +11,24 @@ import (
 )
 
 type FileStore struct {
-	library string
+	dir string
 }
 
-func NewFileStore(library string) *FileStore {
-	return &FileStore{library: library}
+func NewFileStore(dir string) *FileStore {
+	return &FileStore{dir: dir}
 }
 
 func (s *FileStore) LoadAll() ([]Track, error) {
-	entries, err := os.ReadDir(s.library)
+	entries, err := os.ReadDir(s.dir)
 	if err != nil {
-		return nil, fmt.Errorf("read library: %w", err)
+		return nil, fmt.Errorf("read metadata path: %w", err)
 	}
 	tracks := make([]Track, 0)
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
-		path := filepath.Join(s.library, entry.Name())
+		path := filepath.Join(s.dir, entry.Name())
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("read sidecar %s: %w", entry.Name(), err)
@@ -53,8 +53,8 @@ func (s *FileStore) Save(tr Track) error {
 	if err != nil {
 		return fmt.Errorf("marshal track %s: %w", tr.VideoID, err)
 	}
-	tmpPath := filepath.Join(s.library, tr.VideoID+".json.tmp")
-	finalPath := filepath.Join(s.library, tr.VideoID+".json")
+	tmpPath := filepath.Join(s.dir, tr.VideoID+".json.tmp")
+	finalPath := filepath.Join(s.dir, tr.VideoID+".json")
 	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
 		return fmt.Errorf("write sidecar temp %s: %w", tr.VideoID, err)
 	}

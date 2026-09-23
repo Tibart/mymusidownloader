@@ -24,6 +24,11 @@ type Track struct {
 	SourceTitle       string    `json:"sourceTitle,omitempty"`
 	Artist            string    `json:"artist"`
 	Genre             string    `json:"genre"`
+	Channel           string    `json:"channel,omitempty"`
+	UploadDate        string    `json:"uploadDate,omitempty"`
+	DurationSec       int       `json:"durationSec,omitempty"`
+	SampleRate        int       `json:"sampleRate,omitempty"`
+	Channels          int       `json:"channels,omitempty"`
 	State             State     `json:"state"`
 	FileName          string    `json:"fileName,omitempty"`
 	Error             string    `json:"error,omitempty"`
@@ -48,11 +53,31 @@ type StartResult struct {
 }
 
 type Tags struct {
-	Title  string
-	Artist string
-	Genre  string
+	Title       string
+	Artist      string
+	Genre       string
+	Channel     string
+	UploadDate  string
+	SourceURL   string
+	Codec       string
+	BitrateKbps int
+	DurationSec int
+	SampleRate  int
+	Channels    int
 }
 
 func (t Track) Tags() Tags {
-	return Tags{Title: t.Title, Artist: t.Artist, Genre: t.Genre}
+	return Tags{
+		Title:       t.Title,
+		Artist:      t.Artist,
+		Genre:       t.Genre,
+		Channel:     t.Channel,
+		UploadDate:  t.UploadDate,
+		SourceURL:   t.URL,
+		Codec:       t.StoredCodec,
+		BitrateKbps: t.SourceBitrateKbps,
+		DurationSec: t.DurationSec,
+		SampleRate:  t.SampleRate,
+		Channels:    t.Channels,
+	}
 }

@@ -40,9 +40,6 @@ func canonicalExt(codec, ext string) string {
 		}
 		return "m4a"
 	case "opus":
-		if ext == "webm" || ext == "ogg" || ext == "opus" {
-			return ext
-		}
 		return "opus"
 	default:
 		if ext != "" {

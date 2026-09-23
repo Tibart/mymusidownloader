@@ -1,4 +1,5 @@
 download/
+metadata/
 bin/
 *.exe
 *.test

@@ -13,6 +13,7 @@ const (
 	DefaultPort          = 6874
 	DefaultMaxConcurrent = 2
 	DefaultLibrary       = "./download"
+	DefaultMetadata      = "./metadata"
 	DefaultYTDLPPath     = "/usr/local/bin/yt-dlp"
 	DefaultFFmpegPath    = "/usr/bin/ffmpeg"
 )
@@ -20,6 +21,7 @@ const (
 // Config holds runtime settings for the daemon.
 type Config struct {
 	LibraryPath   string `json:"libraryPath"`
+	MetadataPath  string `json:"metadataPath"`
 	Port          int    `json:"port"`
 	MaxConcurrent int    `json:"maxConcurrent"`
 	Bind          string `json:"bind"`
@@ -55,6 +57,9 @@ func (c *Config) ApplyDefaults(bindResolver func() string) {
 	if c.LibraryPath == "" {
 		c.LibraryPath = DefaultLibrary
 	}
+	if c.MetadataPath == "" {
+		c.MetadataPath = DefaultMetadata
+	}
 	if c.Bind == "" {
 		c.Bind = bindResolver()
 	}
@@ -80,7 +85,13 @@ func (c Config) Validate() error {
 	if c.LibraryPath == "" {
 		return errors.New("libraryPath is required")
 	}
-	return ValidateLibrary(c.LibraryPath)
+	if c.MetadataPath == "" {
+		return errors.New("metadataPath is required")
+	}
+	if err := ValidateLibrary(c.LibraryPath); err != nil {
+		return err
+	}
+	return ValidateLibrary(c.MetadataPath)
 }
 
 func ValidateLibrary(path string) error {

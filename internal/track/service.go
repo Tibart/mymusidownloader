@@ -30,6 +30,11 @@ type DownloadedMedia struct {
 	BitrateKbps   int
 	OriginalURL   string
 	NormalizedURL string
+	Channel       string
+	UploadDate    string
+	DurationSec   int
+	SampleRate    int
+	Channels      int
 }
 
 type Downloader interface {
@@ -39,6 +44,7 @@ type Downloader interface {
 type MediaTool interface {
 	ConvertToOpus(ctx context.Context, inputPath, outputPath string, bitrateKbps int, tags Tags) error
 	WriteTags(ctx context.Context, path string, tags Tags) error
+	Remux(ctx context.Context, inputPath, outputPath string) error
 }
 
 type Service struct {
@@ -349,6 +355,21 @@ func (s *Service) captureMetadata(videoID string, mediaFile DownloadedMedia) (st
 	}
 	tr.SourceCodec = strings.ToLower(mediaFile.Codec)
 	tr.SourceBitrateKbps = mediaFile.BitrateKbps
+	if mediaFile.Channel != "" {
+		tr.Channel = mediaFile.Channel
+	}
+	if mediaFile.UploadDate != "" {
+		tr.UploadDate = mediaFile.UploadDate
+	}
+	if mediaFile.DurationSec > 0 {
+		tr.DurationSec = mediaFile.DurationSec
+	}
+	if mediaFile.SampleRate > 0 {
+		tr.SampleRate = mediaFile.SampleRate
+	}
+	if mediaFile.Channels > 0 {
+		tr.Channels = mediaFile.Channels
+	}
 	tr.TouchedAt = s.now()
 	if err := s.store.Save(*tr); err != nil {
 		return "", Tags{}, time.Time{}, err
@@ -469,7 +490,14 @@ func (s *Service) storeMedia(ctx context.Context, videoID string, downloaded Dow
 	if media.KeepSourceCodec(codec) {
 		candidateName := media.BuildFinalName(startedAt.Local(), title, videoID, ext, media.CandidateExistsInDir(s.library))
 		finalPath := filepath.Join(s.library, candidateName)
-		if err := os.Rename(downloaded.Path, finalPath); err != nil {
+		sourceExt := strings.TrimPrefix(strings.ToLower(filepath.Ext(downloaded.Path)), ".")
+		if sourceExt != "" && sourceExt != ext {
+			if err := s.mediaTool.Remux(ctx, downloaded.Path, finalPath); err != nil {
+				_ = os.Remove(finalPath)
+				return "", "", fmt.Errorf("remux audio file: %w", err)
+			}
+			_ = os.Remove(downloaded.Path)
+		} else if err := os.Rename(downloaded.Path, finalPath); err != nil {
 			return "", "", fmt.Errorf("rename audio file: %w", err)
 		}
 		if err := s.mediaTool.WriteTags(ctx, finalPath, tags); err != nil {

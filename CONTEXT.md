@@ -76,11 +76,11 @@ _Avoid_: Video id, slug
 - "Status API" was proposed, then dropped. Progress after the **Start result** is visible only on the **Recent page**, including rows that do not have an MP3 yet.
 - "Date" in the **File name** is the download date, not the video's publish date.
 - The project path is `/mnt/c/Repos/mymusidownloader`, not a folder inside the tax vault.
-- The daemon is a systemd user service on a Raspberry Pi 5, Tailscale name `pi`, running as the normal user `musi`. That user is created for this daemon and added to the group `media`, which can write `/mnt/exthd/music`. Settings live in `/home/musi/.config/mymusidownloader/config.json`.
+- The daemon is a systemd system service on a Raspberry Pi 5, Tailscale name `pi`, running as the user `musi`. That user has no home directory. It is in the group `media`, which can write `/mnt/exthd/mymusi/download` and `/mnt/exthd/mymusi/data`. Settings live in `/etc/mymusidownloader/config.json`.
 - `/mnt/c/Repos/mymusidownloader` is the editing repo. It is not the path on the Pi.
 - `yt-dlp` on the Pi is the current upstream aarch64 binary, not the distro package. `ffmpeg` may come from apt.
 - A new build is cross-compiled to `linux/arm64` and copied to the Pi. The Pi does not build it.
-- On the Pi the **Library** setting points at `/mnt/exthd/music`. If that path is missing or not writable, the daemon does not start and does not write to the SD card.
+- On the Pi the **Library** is `/mnt/exthd/mymusi/download` and the JSON records are in `/mnt/exthd/mymusi/data`. If either path is missing or not writable, the daemon does not start and does not write to the SD card.
 - There is no login yet. Who may send a **Trigger** is a network decision, not an account. Default listen is the Tailscale address, or `127.0.0.1` if Tailscale is absent. Not every interface.
 - Private, age-gated, and login-only videos are out of scope. A fetch that needs a YouTube login fails the **Track**. No cookies and no Google account.
 - "MP3" was the original store format. Resolved: keep the source codec when it is an allowed **Audio file**. If the codec is not allowed, convert once to Opus at a bitrate no higher than the source. Tag edits do not encode again.

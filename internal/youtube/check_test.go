@@ -13,10 +13,12 @@ func TestParse(t *testing.T) {
 		{name: "plain id", input: "dQw4w9WgXcQ", wantID: "dQw4w9WgXcQ", wantURL: WatchURL("dQw4w9WgXcQ")},
 		{name: "watch url", input: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", wantID: "dQw4w9WgXcQ", wantURL: WatchURL("dQw4w9WgXcQ")},
 		{name: "watch url with extra query", input: "https://youtube.com/watch?v=dQw4w9WgXcQ&t=10", wantID: "dQw4w9WgXcQ", wantURL: WatchURL("dQw4w9WgXcQ")},
-		{name: "playlist rejected", input: "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123", wantErr: true},
+		{name: "watch url with playlist param still one video", input: "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123", wantID: "dQw4w9WgXcQ", wantURL: WatchURL("dQw4w9WgXcQ")},
+		{name: "youtu.be", input: "https://youtu.be/dQw4w9WgXcQ", wantID: "dQw4w9WgXcQ", wantURL: WatchURL("dQw4w9WgXcQ")},
+		{name: "shorts", input: "https://www.youtube.com/shorts/dQw4w9WgXcQ", wantID: "dQw4w9WgXcQ", wantURL: WatchURL("dQw4w9WgXcQ")},
+		{name: "playlist page rejected", input: "https://www.youtube.com/playlist?list=PL123", wantErr: true},
 		{name: "channel rejected", input: "https://www.youtube.com/channel/UC1234567890", wantErr: true},
 		{name: "search rejected", input: "https://www.youtube.com/results?search_query=test", wantErr: true},
-		{name: "short url rejected", input: "https://youtu.be/dQw4w9WgXcQ", wantErr: true},
 		{name: "bad id rejected", input: "not-an-id", wantErr: true},
 	}
 

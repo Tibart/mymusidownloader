@@ -29,7 +29,7 @@ func main() {
 		log.Fatalf("invalid config: %v", err)
 	}
 
-	store := track.NewFileStore(cfg.LibraryPath)
+	store := track.NewFileStore(cfg.MetadataPath)
 	svc, err := track.NewService(
 		cfg.LibraryPath,
 		cfg.MaxConcurrent,
