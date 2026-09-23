@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>My Musi Downloader</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Musi">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f4fb">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f1016">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+  <link rel="stylesheet" href="/static/style.css">
+  {{if .Refresh}}<meta http-equiv="refresh" content="5">{{end}}
+</head>
+<body>
+  <header class="topbar">
+    <h1>My Musi Downloader</h1>
+  </header>
+  <main>
+    {{if .Notice}}<p class="notice">{{.Notice}}</p>{{end}}
+
+    <form class="trigger" method="post" action="/trigger">
+      <label for="url">YouTube watch URL or video id</label>
+      <div class="trigger-row">
+        <input id="url" type="text" name="url" required placeholder="https://youtu.be/...">
+        <button type="submit">Trigger</button>
+      </div>
+    </form>
+
+    <ul class="tracks">
+      {{range .Tracks}}
+      <li class="track" data-state="{{.State}}">
+        <div class="art">
+          {{if .HasArtwork}}
+          <img src="/tracks/{{.VideoID}}/artwork" alt="" loading="lazy">
+          {{else}}
+          <div class="art-placeholder" aria-hidden="true">&#9834;</div>
+          {{end}}
+        </div>
+        <div class="meta">
+          <form id="edit-{{.VideoID}}" method="post" action="/tracks/{{.VideoID}}"></form>
+          <input form="edit-{{.VideoID}}" class="title-input" type="text" name="title" value="{{.Title}}" aria-label="Title">
+          <div class="field-grid">
+            <input form="edit-{{.VideoID}}" type="text" name="artist" value="{{.Artist}}" placeholder="Artist" aria-label="Artist">
+            <input form="edit-{{.VideoID}}" type="text" name="album" value="{{.Album}}" placeholder="Album" aria-label="Album">
+            <input form="edit-{{.VideoID}}" type="text" name="genre" value="{{.Genre}}" placeholder="Genre" aria-label="Genre">
+          </div>
+          <div class="info-row">
+            <span class="date">{{formatDate .Track}}</span>
+            <span class="badge">{{.State}}</span>
+            <span class="filename">{{.FileName}}</span>
+          </div>
+          {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+        </div>
+        <div class="actions">
+          {{if not (or (eq .State "queued") (eq .State "downloading") (eq .State "converting"))}}
+          <button form="edit-{{.VideoID}}" type="submit" class="primary">Save</button>
+          {{end}}
+          {{if or (eq .State "queued") (eq .State "downloading")}}
+          <form method="post" action="/tracks/{{.VideoID}}/cancel"><button type="submit">Cancel</button></form>
+          {{end}}
+          {{if or (eq .State "failed") (eq .State "cancelled")}}
+          <form method="post" action="/tracks/{{.VideoID}}/restart"><button type="submit">Restart</button></form>
+          {{end}}
+          {{if not (or (eq .State "queued") (eq .State "downloading") (eq .State "converting"))}}
+          <form method="post" action="/tracks/{{.VideoID}}/delete" onsubmit="return confirm('Delete this track?');"><button type="submit" class="danger">Delete</button></form>
+          {{end}}
+          {{if and (eq .State "done") (ne .StoredCodec "aac")}}
+          <form method="post" action="/tracks/{{.VideoID}}/convert">
+            <button type="submit" name="equivalent" value="true">AAC equivalent</button>
+          </form>
+          {{end}}
+        </div>
+      </li>
+      {{else}}
+      <li class="empty">No tracks touched in the last month.</li>
+      {{end}}
+    </ul>
+  </main>
+  <footer>mymusidownloader {{.Version}}</footer>
+</body>
+</html>

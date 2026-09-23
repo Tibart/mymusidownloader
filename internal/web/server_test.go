@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +27,9 @@ type stubApp struct {
 	trackResult   track.Track
 	recentTracks  []track.Track
 	recentReload  bool
+
+	artworkPath string
+	artworkOK   bool
 }
 
 func (s *stubApp) Trigger(ctx context.Context, input string) (track.StartResult, error) {
@@ -61,6 +65,10 @@ func (s *stubApp) Restart(ctx context.Context, videoID string) (track.StartResul
 
 func (s *stubApp) Recent() ([]track.Track, bool) {
 	return s.recentTracks, s.recentReload
+}
+
+func (s *stubApp) ArtworkPath(videoID string) (string, bool) {
+	return s.artworkPath, s.artworkOK
 }
 
 func TestServerRoutes(t *testing.T) {
@@ -201,5 +209,144 @@ func TestServerRoutes(t *testing.T) {
 			handler.ServeHTTP(rec, req)
 			tt.check(t, rec)
 		})
+	}
+}
+
+func TestServerArtwork(t *testing.T) {
+	dir := t.TempDir()
+	artworkFile := dir + "/abc123def45.jpg"
+	if err := os.WriteFile(artworkFile, []byte("fake-jpeg-bytes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	app := &stubApp{artworkPath: artworkFile, artworkOK: true}
+	server, err := New(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Handler()
+
+	t.Run("existing artwork served", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/tracks/abc123def45/artwork", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", rec.Code)
+		}
+		if rec.Body.String() != "fake-jpeg-bytes" {
+			t.Fatalf("body = %q", rec.Body.String())
+		}
+	})
+
+	t.Run("missing artwork is 404", func(t *testing.T) {
+		missing := &stubApp{artworkOK: false}
+		missingServer, err := New(missing)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req := httptest.NewRequest(http.MethodGet, "/tracks/abc123def45/artwork", nil)
+		rec := httptest.NewRecorder()
+		missingServer.Handler().ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404", rec.Code)
+		}
+	})
+
+	t.Run("invalid video id is 404", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/tracks/not-valid/artwork", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404", rec.Code)
+		}
+	})
+
+	t.Run("post method not allowed", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/tracks/abc123def45/artwork", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404", rec.Code)
+		}
+	})
+}
+
+func TestServerStaticAssets(t *testing.T) {
+	server, err := New(&stubApp{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Handler()
+
+	for _, path := range []string{"/static/style.css", "/static/manifest.json", "/static/icon-192.png", "/static/apple-touch-icon.png"} {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200", rec.Code)
+			}
+			if rec.Body.Len() == 0 {
+				t.Fatalf("empty body for %s", path)
+			}
+		})
+	}
+}
+
+func TestRecentPageAppShellMeta(t *testing.T) {
+	app := &stubApp{}
+	server, err := New(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	body := rec.Body.String()
+
+	for _, want := range []string{
+		`name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"`,
+		`name="apple-mobile-web-app-capable" content="yes"`,
+		`rel="manifest" href="/static/manifest.json"`,
+		`name="theme-color" media="(prefers-color-scheme: dark)"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("page missing %q\n%s", want, body)
+		}
+	}
+}
+
+func TestRecentPageArtworkRendering(t *testing.T) {
+	tracks := []track.Track{{VideoID: "abc123def45", Title: "Has Art", State: track.StateDone}}
+
+	withArt := &stubApp{recentTracks: tracks, artworkOK: true}
+	withArtServer, err := New(withArt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	withArtServer.Handler().ServeHTTP(rec, req)
+	body := rec.Body.String()
+	if !strings.Contains(body, `<img src="/tracks/abc123def45/artwork"`) {
+		t.Fatalf("expected artwork img tag when artwork exists: %s", body)
+	}
+
+	withoutArt := &stubApp{recentTracks: tracks, artworkOK: false}
+	withoutArtServer, err := New(withoutArt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	rec = httptest.NewRecorder()
+	withoutArtServer.Handler().ServeHTTP(rec, req)
+	body = rec.Body.String()
+	if strings.Contains(body, "<img") {
+		t.Fatalf("expected placeholder, not an img tag, when no artwork exists: %s", body)
+	}
+	if !strings.Contains(body, "art-placeholder") {
+		t.Fatalf("expected placeholder element: %s", body)
 	}
 }

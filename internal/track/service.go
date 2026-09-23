@@ -291,6 +291,15 @@ func (s *Service) Recent() ([]Track, bool) {
 	return tracks, refresh
 }
 
+// ArtworkPath reports the cover JPEG path for videoID when the file exists on disk.
+func (s *Service) ArtworkPath(videoID string) (string, bool) {
+	path := s.store.ArtworkPath(videoID)
+	if _, err := os.Stat(path); err != nil {
+		return "", false
+	}
+	return path, true
+}
+
 func (s *Service) Get(videoID string) (Track, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

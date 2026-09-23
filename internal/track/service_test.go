@@ -610,6 +610,33 @@ func waitIdle(t *testing.T, service *Service) {
 	})
 }
 
+func TestServiceArtworkPath(t *testing.T) {
+	library := t.TempDir()
+	metadata := t.TempDir()
+	store := NewFileStore(metadata)
+	service, err := NewService(library, 1, store, &fakeDownloader{}, &fakeMediaTool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := service.ArtworkPath("dQw4w9WgXcQ"); ok {
+		t.Fatal("expected no artwork before the file exists")
+	}
+
+	artPath := store.ArtworkPath("dQw4w9WgXcQ")
+	if err := os.WriteFile(artPath, []byte("jpeg"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := service.ArtworkPath("dQw4w9WgXcQ")
+	if !ok {
+		t.Fatal("expected artwork to exist once the file is written")
+	}
+	if got != artPath {
+		t.Fatalf("path = %q, want %q", got, artPath)
+	}
+}
+
 func waitForState(t *testing.T, service *Service, videoID string, want State) {
 	t.Helper()
 	waitFor(t, func() bool {
