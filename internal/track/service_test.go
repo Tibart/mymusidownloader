@@ -99,6 +99,10 @@ type fakeMediaTool struct {
 	holdWrite    chan struct{}
 }
 
+func (f *fakeMediaTool) ConvertToAAC(ctx context.Context, inputPath, outputPath string, bitrateKbps int, tags Tags) error {
+	return f.ConvertToOpus(ctx, inputPath, outputPath, bitrateKbps, tags)
+}
+
 func (f *fakeMediaTool) ConvertToOpus(ctx context.Context, inputPath, outputPath string, bitrateKbps int, tags Tags) error {
 	f.mu.Lock()
 	f.convertCalls = append(f.convertCalls, convertCall{input: inputPath, output: outputPath, bitrate: bitrateKbps, tags: tags})
@@ -353,7 +357,7 @@ func TestServiceCodecHandlingAndTagEdits(t *testing.T) {
 				}
 			}
 
-			if _, err := service.Update("dQw4w9WgXcQ", "Edited Title", "Edited Artist", "Edited Genre"); err != nil {
+			if _, err := service.Update("dQw4w9WgXcQ", "Edited Title", "Edited Artist", "Edited Genre", ""); err != nil {
 				t.Fatal(err)
 			}
 			if mediaTool.ConvertCount() != tt.wantConvertCount {

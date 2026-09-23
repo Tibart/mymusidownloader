@@ -43,6 +43,7 @@ type Downloader interface {
 
 type MediaTool interface {
 	ConvertToOpus(ctx context.Context, inputPath, outputPath string, bitrateKbps int, tags Tags) error
+	ConvertToAAC(ctx context.Context, inputPath, outputPath string, bitrateKbps int, tags Tags) error
 	WriteTags(ctx context.Context, path string, tags Tags) error
 	Remux(ctx context.Context, inputPath, outputPath string) error
 }
@@ -200,17 +201,22 @@ func (s *Service) Cancel(videoID string) (Track, error) {
 	}
 }
 
-func (s *Service) Update(videoID, title, artist, genre string) (Track, error) {
+func (s *Service) Update(videoID, title, artist, genre, album string) (Track, error) {
 	s.mu.Lock()
 	tr, ok := s.tracks[videoID]
 	if !ok {
 		s.mu.Unlock()
 		return Track{}, ErrNotFound
 	}
+	if tr.State == StateConverting || tr.State == StateQueued || tr.State == StateDownloading {
+		s.mu.Unlock()
+		return Track{}, ErrInvalidTransition
+	}
 	updated := *tr
 	updated.Title = title
 	updated.Artist = artist
 	updated.Genre = genre
+	updated.Album = AlbumName(artist, album)
 	updated.TouchedAt = s.now()
 	path := ""
 	if s.hasAudioFileLocked(tr) {
@@ -233,6 +239,7 @@ func (s *Service) Update(videoID, title, artist, genre string) (Track, error) {
 	current.Title = updated.Title
 	current.Artist = updated.Artist
 	current.Genre = updated.Genre
+	current.Album = updated.Album
 	current.TouchedAt = updated.TouchedAt
 	if err := s.store.Save(*current); err != nil {
 		return Track{}, err
@@ -248,7 +255,7 @@ func (s *Service) Recent() ([]Track, bool) {
 	tracks := RecentTracks(s.tracks, since)
 	refresh := false
 	for _, tr := range tracks {
-		if tr.State == StateQueued || tr.State == StateDownloading {
+			if tr.State == StateQueued || tr.State == StateDownloading || tr.State == StateConverting {
 			refresh = true
 			break
 		}
@@ -525,6 +532,112 @@ func (s *Service) storeMedia(ctx context.Context, videoID string, downloaded Dow
 		return "", "", fmt.Errorf("remove source file: %w", err)
 	}
 	return candidateName, "opus", nil
+}
+
+func (s *Service) Convert(_ context.Context, videoID string, equivalent bool) (Track, error) {
+	if !equivalent {
+		return Track{}, errors.New("only equivalent aac conversion is allowed")
+	}
+	s.mu.Lock()
+	tr, ok := s.tracks[videoID]
+	if !ok {
+		s.mu.Unlock()
+		return Track{}, ErrNotFound
+	}
+	if tr.State == StateConverting {
+		current := *tr
+		s.mu.Unlock()
+		return current, nil
+	}
+	if tr.State != StateDone || !s.hasAudioFileLocked(tr) {
+		s.mu.Unlock()
+		return Track{}, ErrInvalidTransition
+	}
+	bitrate := media.EquivalentAACBitrate(tr.SourceBitrateKbps)
+	if bitrate <= 0 {
+		s.mu.Unlock()
+		return Track{}, errUnknownBitrate
+	}
+	sourcePath := tr.AudioPath(s.library)
+	tags := tr.Tags()
+	title := tr.Title
+	startedAt := tr.DownloadStartedAt
+	if startedAt.IsZero() {
+		startedAt = s.now()
+	}
+	tr.State = StateConverting
+	tr.Error = ""
+	tr.TouchedAt = s.now()
+	if err := s.store.Save(*tr); err != nil {
+		tr.State = StateDone
+		s.mu.Unlock()
+		return Track{}, err
+	}
+	current := *tr
+	s.mu.Unlock()
+
+	go s.finishConvert(videoID, sourcePath, title, startedAt, bitrate, tags)
+	return current, nil
+}
+
+func (s *Service) finishConvert(videoID, sourcePath, title string, startedAt time.Time, bitrate int, tags Tags) {
+	tags.Codec = "aac"
+	tags.BitrateKbps = bitrate
+	candidateName := media.BuildFinalName(startedAt.Local(), title, videoID, "m4a", media.CandidateExistsInDir(s.library))
+	finalPath := filepath.Join(s.library, candidateName)
+	if err := s.mediaTool.ConvertToAAC(context.Background(), sourcePath, finalPath, bitrate, tags); err != nil {
+		_ = os.Remove(finalPath)
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		tr, ok := s.tracks[videoID]
+		if !ok {
+			return
+		}
+		tr.State = StateDone
+		tr.Error = err.Error()
+		tr.TouchedAt = s.now()
+		_ = s.store.Save(*tr)
+		return
+	}
+	if finalPath != sourcePath {
+		_ = os.Remove(sourcePath)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, ok := s.tracks[videoID]
+	if !ok {
+		_ = os.Remove(finalPath)
+		return
+	}
+	current.FileName = candidateName
+	current.StoredCodec = "aac"
+	current.State = StateDone
+	current.Error = ""
+	current.TouchedAt = s.now()
+	_ = s.store.Save(*current)
+}
+
+func (s *Service) storeAAC(ctx context.Context, videoID string, downloaded DownloadedMedia, title string, startedAt time.Time, tags Tags) (string, string, error) {
+	bitrate := downloaded.BitrateKbps
+	if bitrate <= 0 {
+		return "", "", errUnknownBitrate
+	}
+	if s.stopped(videoID) || ctx.Err() != nil {
+		return "", "", errStopped
+	}
+	candidateName := media.BuildFinalName(startedAt.Local(), title, videoID, "m4a", media.CandidateExistsInDir(s.library))
+	finalPath := filepath.Join(s.library, candidateName)
+	tags.Codec = "aac"
+	tags.BitrateKbps = bitrate
+	if err := s.mediaTool.ConvertToAAC(ctx, downloaded.Path, finalPath, bitrate, tags); err != nil {
+		_ = os.Remove(finalPath)
+		return "", "", fmt.Errorf("convert to aac: %w", err)
+	}
+	if err := os.Remove(downloaded.Path); err != nil && !os.IsNotExist(err) {
+		_ = os.Remove(finalPath)
+		return "", "", fmt.Errorf("remove source file: %w", err)
+	}
+	return candidateName, "aac", nil
 }
 
 func (s *Service) hasAudioFileLocked(tr *Track) bool {

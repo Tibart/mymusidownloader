@@ -2,6 +2,7 @@ package track
 
 import (
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -12,6 +13,7 @@ const (
 	StateStored      State = "stored"
 	StateQueued      State = "queued"
 	StateDownloading State = "downloading"
+	StateConverting  State = "converting"
 	StateDone        State = "done"
 	StateFailed      State = "failed"
 	StateCancelled   State = "cancelled"
@@ -23,6 +25,7 @@ type Track struct {
 	Title             string    `json:"title"`
 	SourceTitle       string    `json:"sourceTitle,omitempty"`
 	Artist            string    `json:"artist"`
+	Album             string    `json:"album"`
 	Genre             string    `json:"genre"`
 	Channel           string    `json:"channel,omitempty"`
 	UploadDate        string    `json:"uploadDate,omitempty"`
@@ -37,6 +40,18 @@ type Track struct {
 	SourceCodec       string    `json:"sourceCodec,omitempty"`
 	StoredCodec       string    `json:"storedCodec,omitempty"`
 	SourceBitrateKbps int       `json:"sourceBitrateKbps,omitempty"`
+}
+
+func AlbumName(artist, album string) string {
+	album = strings.TrimSpace(album)
+	if album != "" {
+		return album
+	}
+	artist = strings.TrimSpace(artist)
+	if artist == "" {
+		return ""
+	}
+	return artist + " Live"
 }
 
 func (t Track) AudioPath(library string) string {
@@ -56,6 +71,7 @@ type Tags struct {
 	Title       string
 	Artist      string
 	Genre       string
+	Album       string
 	Channel     string
 	UploadDate  string
 	SourceURL   string
@@ -71,6 +87,7 @@ func (t Track) Tags() Tags {
 		Title:       t.Title,
 		Artist:      t.Artist,
 		Genre:       t.Genre,
+		Album:       AlbumName(t.Artist, t.Album),
 		Channel:     t.Channel,
 		UploadDate:  t.UploadDate,
 		SourceURL:   t.URL,

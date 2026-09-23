@@ -100,6 +100,20 @@ type FFmpegMediaTool struct {
 	FFmpegPath string
 }
 
+func (t FFmpegMediaTool) ConvertToAAC(ctx context.Context, inputPath, outputPath string, bitrateKbps int, tags track.Tags) error {
+	tags.Codec = "aac"
+	tags.BitrateKbps = bitrateKbps
+	args := append([]string{
+		"-y",
+		"-i", inputPath,
+		"-c:a", "aac",
+		"-b:a", fmt.Sprintf("%dk", bitrateKbps),
+		"-movflags", "+faststart",
+	}, metadataArgs(tags)...)
+	args = append(args, outputPath)
+	return runFFmpeg(ctx, t.FFmpegPath, args...)
+}
+
 func (t FFmpegMediaTool) ConvertToOpus(ctx context.Context, inputPath, outputPath string, bitrateKbps int, tags track.Tags) error {
 	tags.Codec = "opus"
 	tags.BitrateKbps = bitrateKbps
@@ -164,7 +178,7 @@ func metadataArgs(tags track.Tags) []string {
 		{"artist", tags.Artist},
 		{"album_artist", tags.Artist},
 		{"genre", tags.Genre},
-		{"album", tags.Channel},
+		{"album", tags.Album},
 		{"date", tags.UploadDate},
 		{"codec", tags.Codec},
 		{"bitrate", bitrateTag(tags.BitrateKbps)},

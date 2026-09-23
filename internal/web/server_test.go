@@ -33,7 +33,7 @@ func (s *stubApp) Trigger(ctx context.Context, input string) (track.StartResult,
 	return s.triggerResult, nil
 }
 
-func (s *stubApp) Update(videoID, title, artist, genre string) (track.Track, error) {
+func (s *stubApp) Update(videoID, title, artist, genre, album string) (track.Track, error) {
 	s.editVideoID = videoID
 	s.editTitle = title
 	s.editArtist = artist
@@ -43,6 +43,10 @@ func (s *stubApp) Update(videoID, title, artist, genre string) (track.Track, err
 
 func (s *stubApp) Cancel(videoID string) (track.Track, error) {
 	s.cancelVideo = videoID
+	return s.trackResult, nil
+}
+
+func (s *stubApp) Convert(ctx context.Context, videoID string, equivalent bool) (track.Track, error) {
 	return s.trackResult, nil
 }
 

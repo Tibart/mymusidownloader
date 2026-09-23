@@ -5,6 +5,24 @@ import (
 	"time"
 )
 
+func TestEquivalentAACBitrate(t *testing.T) {
+	tests := []struct {
+		opus int
+		aac  int
+	}{
+		{96, 128},
+		{128, 160},
+		{160, 192},
+		{192, 224},
+		{0, 0},
+	}
+	for _, tt := range tests {
+		if got := EquivalentAACBitrate(tt.opus); got != tt.aac {
+			t.Fatalf("EquivalentAACBitrate(%d) = %d, want %d", tt.opus, got, tt.aac)
+		}
+	}
+}
+
 func TestPascalTitle(t *testing.T) {
 	tests := []struct {
 		input string

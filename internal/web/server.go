@@ -16,9 +16,10 @@ import (
 
 type App interface {
 	Trigger(ctx context.Context, input string) (track.StartResult, error)
-	Update(videoID, title, artist, genre string) (track.Track, error)
+	Update(videoID, title, artist, genre, album string) (track.Track, error)
 	Cancel(videoID string) (track.Track, error)
 	Restart(ctx context.Context, videoID string) (track.StartResult, error)
+	Convert(ctx context.Context, videoID string, equivalent bool) (track.Track, error)
 	Recent() ([]track.Track, bool)
 }
 
@@ -115,6 +116,8 @@ func (s *Server) handleTrackAction(w http.ResponseWriter, r *http.Request) {
 		s.handleCancel(w, r, videoID)
 	case "restart":
 		s.handleRestart(w, r, videoID)
+	case "convert":
+		s.handleConvert(w, r, videoID)
 	default:
 		http.NotFound(w, r)
 	}
@@ -125,6 +128,7 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request, videoID stri
 		Title  string `json:"title"`
 		Artist string `json:"artist"`
 		Genre  string `json:"genre"`
+		Album  string `json:"album"`
 	}{}
 	if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -139,8 +143,9 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request, videoID stri
 		payload.Title = r.FormValue("title")
 		payload.Artist = r.FormValue("artist")
 		payload.Genre = r.FormValue("genre")
+		payload.Album = r.FormValue("album")
 	}
-	tr, err := s.app.Update(videoID, payload.Title, payload.Artist, payload.Genre)
+	tr, err := s.app.Update(videoID, payload.Title, payload.Artist, payload.Genre, payload.Album)
 	if err != nil {
 		writeTrackError(w, r, err)
 		return
@@ -154,6 +159,41 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request, videoID stri
 
 func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request, videoID string) {
 	tr, err := s.app.Cancel(videoID)
+	if err != nil {
+		writeTrackError(w, r, err)
+		return
+	}
+	if wantsJSON(r) {
+		writeJSON(w, http.StatusOK, tr)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (s *Server) handleConvert(w http.ResponseWriter, r *http.Request, videoID string) {
+	equivalent := true
+	if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+		var body struct {
+			Equivalent *bool `json:"equivalent"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" {
+			writeError(w, r, http.StatusBadRequest, fmt.Errorf("decode body: %w", err))
+			return
+		}
+		if body.Equivalent != nil {
+			equivalent = *body.Equivalent
+		}
+	} else if err := r.ParseForm(); err != nil {
+		writeError(w, r, http.StatusBadRequest, err)
+		return
+	} else if value := r.FormValue("equivalent"); value != "" {
+		equivalent = value != "false"
+	}
+	if !equivalent {
+		writeError(w, r, http.StatusBadRequest, errors.New("only equivalent aac conversion is allowed"))
+		return
+	}
+	tr, err := s.app.Convert(r.Context(), videoID, true)
 	if err != nil {
 		writeTrackError(w, r, err)
 		return
@@ -295,6 +335,7 @@ const pageTemplate = `<!doctype html>
         <th>Date</th>
         <th>Title</th>
         <th>Artist</th>
+        <th>Album</th>
         <th>Genre</th>
         <th>State</th>
         <th>File name</th>
@@ -310,6 +351,7 @@ const pageTemplate = `<!doctype html>
           <input form="edit-{{.VideoID}}" type="text" name="title" value="{{.Title}}">
         </td>
         <td><input form="edit-{{.VideoID}}" type="text" name="artist" value="{{.Artist}}"></td>
+        <td><input form="edit-{{.VideoID}}" type="text" name="album" value="{{.Album}}"></td>
         <td><input form="edit-{{.VideoID}}" type="text" name="genre" value="{{.Genre}}"></td>
         <td>
           {{.State}}
@@ -317,17 +359,22 @@ const pageTemplate = `<!doctype html>
         </td>
         <td>{{.FileName}}</td>
         <td class="actions">
-            <button form="edit-{{.VideoID}}" type="submit">Save</button>
+            {{if not (or (eq .State "queued") (eq .State "downloading") (eq .State "converting"))}}<button form="edit-{{.VideoID}}" type="submit">Save</button>{{end}}
           {{if or (eq .State "queued") (eq .State "downloading")}}
           <form method="post" action="/tracks/{{.VideoID}}/cancel"><button type="submit">Cancel</button></form>
           {{end}}
           {{if or (eq .State "failed") (eq .State "cancelled")}}
           <form method="post" action="/tracks/{{.VideoID}}/restart"><button type="submit">Restart</button></form>
           {{end}}
+          {{if and (eq .State "done") (ne .StoredCodec "aac")}}
+          <form method="post" action="/tracks/{{.VideoID}}/convert">
+            <button type="submit" name="equivalent" value="true">AAC equivalent</button>
+          </form>
+          {{end}}
         </td>
       </tr>
       {{else}}
-      <tr><td colspan="7">No tracks touched in the last month.</td></tr>
+      <tr><td colspan="8">No tracks touched in the last month.</td></tr>
       {{end}}
     </tbody>
   </table>
