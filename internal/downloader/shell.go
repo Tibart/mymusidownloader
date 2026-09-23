@@ -106,12 +106,14 @@ type FFmpegMediaTool struct {
 func (t FFmpegMediaTool) ConvertToAAC(ctx context.Context, inputPath, outputPath string, bitrateKbps int, tags track.Tags) error {
 	tags.Codec = "aac"
 	tags.BitrateKbps = bitrateKbps
-	args := append(append(mediaInputs(inputPath, tags.ArtworkPath),
+	artwork, cleanup := t.labeledArtwork(ctx, tags)
+	defer cleanup()
+	args := append(append(mediaInputs(inputPath, artwork),
 		"-c:a", "aac",
 		"-b:a", fmt.Sprintf("%dk", bitrateKbps),
 		"-movflags", "+faststart",
 	), metadataArgs(tags)...)
-	args = append(args, artworkCodecArgs(tags.ArtworkPath)...)
+	args = append(args, artworkCodecArgs(artwork)...)
 	args = append(args, outputPath)
 	return runFFmpeg(ctx, t.FFmpegPath, args...)
 }
@@ -146,8 +148,10 @@ func (t FFmpegMediaTool) WriteTags(ctx context.Context, path string, tags track.
 	ext := filepath.Ext(path)
 	tmpPath := filepath.Join(filepath.Dir(path), "."+strings.TrimSuffix(filepath.Base(path), ext)+".tagtmp"+ext)
 	tags = mergeProbe(tags, t.probe(ctx, path))
-	args := append(mediaInputs(path, tags.ArtworkPath), "-c:a", "copy")
-	args = append(args, artworkCodecArgs(tags.ArtworkPath)...)
+	artwork, cleanup := t.labeledArtwork(ctx, tags)
+	defer cleanup()
+	args := append(mediaInputs(path, artwork), "-c:a", "copy")
+	args = append(args, artworkCodecArgs(artwork)...)
 	args = append(args, metadataArgs(tags)...)
 	args = append(args, tmpPath)
 	if err := runFFmpeg(ctx, t.FFmpegPath, args...); err != nil {
@@ -332,6 +336,84 @@ func findThumbnail(library, videoID string) string {
 		}
 	}
 	return ""
+}
+
+func (t FFmpegMediaTool) labeledArtwork(ctx context.Context, tags track.Tags) (string, func()) {
+	nop := func() {}
+	if tags.ArtworkPath == "" || strings.TrimSpace(tags.Album) == "" {
+		return tags.ArtworkPath, nop
+	}
+	if _, err := os.Stat(tags.ArtworkPath); err != nil {
+		return tags.ArtworkPath, nop
+	}
+	tmp, err := os.CreateTemp("", "cover-*.jpg")
+	if err != nil {
+		return tags.ArtworkPath, nop
+	}
+	tmp.Close()
+	if err := t.labelArtwork(ctx, tags.ArtworkPath, tags.Album, tmp.Name()); err != nil {
+		_ = os.Remove(tmp.Name())
+		return tags.ArtworkPath, nop
+	}
+	return tmp.Name(), func() { _ = os.Remove(tmp.Name()) }
+}
+
+func (t FFmpegMediaTool) labelArtwork(ctx context.Context, inputPath, album, outputPath string) error {
+	font := "/usr/share/fonts/liberation/LiberationSans-Bold.ttf"
+	if _, err := os.Stat(font); err != nil {
+		return err
+	}
+	lines := albumLines(album)
+	boxY, boxH := "ih*0.78", "ih*0.16"
+	textY := []string{"h*0.83"}
+	size := "h/15"
+	if len(lines) == 2 {
+		boxY, boxH = "ih*0.68", "ih*0.26"
+		textY = []string{"h*0.73", "h*0.84"}
+		size = "h/17"
+	}
+	vf := "drawbox=y=" + boxY + ":w=iw:h=" + boxH + ":color=black@0.62:t=fill"
+	for i, line := range lines {
+		vf += ",drawtext=fontfile=" + font +
+			":text=" + drawtextLiteral(line) +
+			":fontcolor=white:fontsize=" + size +
+			":x=(w-text_w)/2:y=" + textY[i] +
+			":borderw=3:bordercolor=black@0.85"
+	}
+	return runFFmpeg(ctx, t.FFmpegPath, "-y", "-i", inputPath, "-vf", vf, "-q:v", "3", outputPath)
+}
+
+func albumLines(album string) []string {
+	album = strings.TrimSpace(album)
+	if len([]rune(album)) <= 16 {
+		return []string{album}
+	}
+	words := strings.Fields(album)
+	if len(words) < 2 {
+		runes := []rune(album)
+		mid := len(runes) / 2
+		return []string{strings.TrimSpace(string(runes[:mid])), strings.TrimSpace(string(runes[mid:]))}
+	}
+	best := 1
+	bestDiff := len(album)
+	for i := 1; i < len(words); i++ {
+		left := len([]rune(strings.Join(words[:i], " ")))
+		right := len([]rune(strings.Join(words[i:], " ")))
+		diff := left - right
+		if diff < 0 {
+			diff = -diff
+		}
+		if diff < bestDiff {
+			bestDiff = diff
+			best = i
+		}
+	}
+	return []string{strings.Join(words[:best], " "), strings.Join(words[best:], " ")}
+}
+
+func drawtextLiteral(text string) string {
+	replacer := strings.NewReplacer(`\`, `\\`, `:`, `\:`, `'`, `\'`, `%`, `\%`)
+	return "'" + replacer.Replace(text) + "'"
 }
 
 func mediaInputs(audioPath, artworkPath string) []string {

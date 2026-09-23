@@ -165,6 +165,32 @@ func (s *Service) Restart(_ context.Context, videoID string) (StartResult, error
 	return s.startLocked(tr, tr.URL)
 }
 
+func (s *Service) Delete(videoID string) error {
+	s.mu.Lock()
+	tr, ok := s.tracks[videoID]
+	if !ok {
+		s.mu.Unlock()
+		return ErrNotFound
+	}
+	if tr.State == StateQueued || tr.State == StateDownloading || tr.State == StateConverting {
+		s.mu.Unlock()
+		return ErrInvalidTransition
+	}
+	audio := ""
+	if tr.FileName != "" {
+		audio = tr.AudioPath(s.library)
+	}
+	delete(s.tracks, videoID)
+	s.queue = removeFromQueue(s.queue, videoID)
+	s.mu.Unlock()
+
+	if audio != "" {
+		_ = os.Remove(audio)
+	}
+	_ = s.removePartials(videoID)
+	return s.store.Delete(videoID)
+}
+
 func (s *Service) Cancel(videoID string) (Track, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -20,6 +20,7 @@ type App interface {
 	Cancel(videoID string) (track.Track, error)
 	Restart(ctx context.Context, videoID string) (track.StartResult, error)
 	Convert(ctx context.Context, videoID string, equivalent bool) (track.Track, error)
+	Delete(videoID string) error
 	Recent() ([]track.Track, bool)
 }
 
@@ -118,6 +119,8 @@ func (s *Server) handleTrackAction(w http.ResponseWriter, r *http.Request) {
 		s.handleRestart(w, r, videoID)
 	case "convert":
 		s.handleConvert(w, r, videoID)
+	case "delete":
+		s.handleDelete(w, r, videoID)
 	default:
 		http.NotFound(w, r)
 	}
@@ -200,6 +203,18 @@ func (s *Server) handleConvert(w http.ResponseWriter, r *http.Request, videoID s
 	}
 	if wantsJSON(r) {
 		writeJSON(w, http.StatusOK, tr)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request, videoID string) {
+	if err := s.app.Delete(videoID); err != nil {
+		writeTrackError(w, r, err)
+		return
+	}
+	if wantsJSON(r) {
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -365,6 +380,9 @@ const pageTemplate = `<!doctype html>
           {{end}}
           {{if or (eq .State "failed") (eq .State "cancelled")}}
           <form method="post" action="/tracks/{{.VideoID}}/restart"><button type="submit">Restart</button></form>
+          {{end}}
+          {{if not (or (eq .State "queued") (eq .State "downloading") (eq .State "converting"))}}
+          <form method="post" action="/tracks/{{.VideoID}}/delete"><button type="submit">Delete</button></form>
           {{end}}
           {{if and (eq .State "done") (ne .StoredCodec "aac")}}
           <form method="post" action="/tracks/{{.VideoID}}/convert">

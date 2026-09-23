@@ -68,6 +68,15 @@ func (s *FileStore) Save(tr Track) error {
 	return nil
 }
 
+func (s *FileStore) Delete(videoID string) error {
+	for _, name := range []string{videoID + ".json", videoID + ".json.tmp", videoID + ".jpg"} {
+		if err := os.Remove(filepath.Join(s.dir, name)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("delete %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
 func RecentTracks(all map[string]*Track, since time.Time) []Track {
 	tracks := make([]Track, 0, len(all))
 	for _, tr := range all {

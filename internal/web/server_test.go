@@ -46,6 +46,10 @@ func (s *stubApp) Cancel(videoID string) (track.Track, error) {
 	return s.trackResult, nil
 }
 
+func (s *stubApp) Delete(videoID string) error {
+	return nil
+}
+
 func (s *stubApp) Convert(ctx context.Context, videoID string, equivalent bool) (track.Track, error) {
 	return s.trackResult, nil
 }
