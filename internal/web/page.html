@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>My Musi Downloader</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -27,7 +27,7 @@
       <label for="url">YouTube watch URL or video id</label>
       <div class="trigger-row">
         <input id="url" type="text" name="url" required placeholder="https://youtu.be/...">
-        <button type="submit">Trigger</button>
+        <button type="submit">Get</button>
       </div>
     </form>
 
@@ -46,8 +46,15 @@
           <input form="edit-{{.VideoID}}" class="title-input" type="text" name="title" value="{{.Title}}" aria-label="Title">
           <div class="field-grid">
             <input form="edit-{{.VideoID}}" type="text" name="artist" value="{{.Artist}}" placeholder="Artist" aria-label="Artist">
-            <input form="edit-{{.VideoID}}" type="text" name="album" value="{{.Album}}" placeholder="Album" aria-label="Album">
-            <input form="edit-{{.VideoID}}" type="text" name="genre" value="{{.Genre}}" placeholder="Genre" aria-label="Genre">
+            <input form="edit-{{.VideoID}}" class="album" type="text" name="album" value="{{.Album}}" placeholder="Album" aria-label="Album">
+            <div class="genre-field">
+              <input form="edit-{{.VideoID}}" type="text" name="genre" value="{{.Genre}}" placeholder="Genre" aria-label="Genre" autocomplete="off">
+              <ul class="genre-list" hidden>
+                {{range $.Genres}}<li>{{.}}</li>{{end}}
+              </ul>
+            </div>
+            <label class="check"><input form="edit-{{.VideoID}}" type="checkbox" name="variousArtists" value="true" {{if .VariousArtists}}checked{{end}}> Various Artists</label>
+            <input form="edit-{{.VideoID}}" type="hidden" name="variousArtists" value="false">
           </div>
           <div class="info-row">
             <span class="date">{{formatDate .Track}}</span>
@@ -82,5 +89,32 @@
     </ul>
   </main>
   <footer>mymusidownloader {{.Version}}</footer>
+  <script>
+    document.querySelectorAll('.genre-field').forEach(function (field) {
+      var input = field.querySelector('input');
+      var list = field.querySelector('.genre-list');
+      var items = list.querySelectorAll('li');
+      function show(filter) {
+        var q = filter ? input.value.trim().toLowerCase() : '';
+        var any = false;
+        items.forEach(function (li) {
+          var ok = q === '' || li.textContent.toLowerCase().indexOf(q) !== -1;
+          li.hidden = !ok;
+          if (ok) any = true;
+        });
+        list.hidden = !any;
+      }
+      input.addEventListener('focus', function () { show(false); });
+      input.addEventListener('input', function () { show(true); });
+      input.addEventListener('blur', function () { setTimeout(function () { list.hidden = true; }, 150); });
+      list.addEventListener('pointerdown', function (event) {
+        var li = event.target.closest('li');
+        if (!li) return;
+        event.preventDefault();
+        input.value = li.textContent;
+        list.hidden = true;
+      });
+    });
+  </script>
 </body>
 </html>

@@ -18,6 +18,14 @@ type trackView struct {
 
 func parsePageTemplate() (*template.Template, error) {
 	return template.New("recent").Funcs(template.FuncMap{
+		"hasGenre": func(genres []string, genre string) bool {
+			for _, item := range genres {
+				if item == genre {
+					return true
+				}
+			}
+			return false
+		},
 		"formatDate": func(t track.Track) string {
 			when := t.DownloadStartedAt
 			if when.IsZero() {

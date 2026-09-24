@@ -48,6 +48,7 @@ type MediaTool interface {
 	WriteTags(ctx context.Context, path string, tags Tags) error
 	Remux(ctx context.Context, inputPath, outputPath string) error
 	PrepareArtwork(ctx context.Context, inputPath, outputPath string) error
+	LabelArtwork(ctx context.Context, inputPath, album, outputPath string) error
 }
 
 type Service struct {
@@ -229,7 +230,7 @@ func (s *Service) Cancel(videoID string) (Track, error) {
 	}
 }
 
-func (s *Service) Update(videoID, title, artist, genre, album string) (Track, error) {
+func (s *Service) Update(videoID, title, artist, genre, album string, variousArtists bool) (Track, error) {
 	s.mu.Lock()
 	tr, ok := s.tracks[videoID]
 	if !ok {
@@ -244,7 +245,9 @@ func (s *Service) Update(videoID, title, artist, genre, album string) (Track, er
 	updated.Title = title
 	updated.Artist = artist
 	updated.Genre = genre
-	updated.Album = AlbumName(artist, album)
+	updated.Album = AlbumName(title, album)
+	updated.VariousArtists = variousArtists
+	s.store.RememberGenre(genre)
 	updated.TouchedAt = s.now()
 	path := ""
 	if s.hasAudioFileLocked(tr) {
@@ -252,6 +255,7 @@ func (s *Service) Update(videoID, title, artist, genre, album string) (Track, er
 	}
 	s.mu.Unlock()
 
+	s.refreshArtwork(&updated)
 	if path != "" {
 		if err := s.mediaTool.WriteTags(context.Background(), path, s.tagsFor(&updated)); err != nil {
 			return Track{}, err
@@ -268,6 +272,7 @@ func (s *Service) Update(videoID, title, artist, genre, album string) (Track, er
 	current.Artist = updated.Artist
 	current.Genre = updated.Genre
 	current.Album = updated.Album
+	current.VariousArtists = updated.VariousArtists
 	current.TouchedAt = updated.TouchedAt
 	if err := s.store.Save(*current); err != nil {
 		return Track{}, err
@@ -420,17 +425,51 @@ func (s *Service) captureMetadata(videoID string, mediaFile DownloadedMedia) (st
 	}
 	tags := s.tagsFor(tr)
 	if mediaFile.ArtworkPath != "" {
-		dest := s.store.ArtworkPath(videoID)
-		if err := s.mediaTool.PrepareArtwork(context.Background(), mediaFile.ArtworkPath, dest); err != nil {
-			_ = os.Rename(mediaFile.ArtworkPath, dest)
-		} else if mediaFile.ArtworkPath != dest {
+		source := s.store.ArtworkSourcePath(videoID)
+		if err := s.mediaTool.PrepareArtwork(context.Background(), mediaFile.ArtworkPath, source); err != nil {
+			_ = os.Rename(mediaFile.ArtworkPath, source)
+		} else if mediaFile.ArtworkPath != source {
 			_ = os.Remove(mediaFile.ArtworkPath)
 		}
-		if _, err := os.Stat(dest); err == nil {
-			tags.ArtworkPath = dest
+		s.refreshArtwork(tr)
+		if _, err := os.Stat(s.store.ArtworkPath(videoID)); err == nil {
+			tags.ArtworkPath = s.store.ArtworkPath(videoID)
 		}
 	}
 	return tr.Title, tags, tr.DownloadStartedAt, nil
+}
+
+func (s *Service) Genres() []string {
+	return s.store.Genres()
+}
+
+func coverLabel(tr *Track) string {
+	if artist := strings.TrimSpace(tr.Artist); artist != "" {
+		return artist
+	}
+	return AlbumName(tr.Title, tr.Album)
+}
+
+func (s *Service) refreshArtwork(tr *Track) {
+	label := coverLabel(tr)
+	if label == "" {
+		return
+	}
+	source := s.store.ArtworkSourcePath(tr.VideoID)
+	display := s.store.ArtworkPath(tr.VideoID)
+	if _, err := os.Stat(source); err != nil {
+		if _, err := os.Stat(display); err != nil {
+			return
+		}
+		data, err := os.ReadFile(display)
+		if err != nil {
+			return
+		}
+		if err := os.WriteFile(source, data, 0o644); err != nil {
+			return
+		}
+	}
+	_ = s.mediaTool.LabelArtwork(context.Background(), source, label, display)
 }
 
 func (s *Service) tagsFor(tr *Track) Tags {
@@ -617,6 +656,7 @@ func (s *Service) Convert(_ context.Context, videoID string, equivalent bool) (T
 		return Track{}, errUnknownBitrate
 	}
 	sourcePath := tr.AudioPath(s.library)
+	s.refreshArtwork(tr)
 	tags := s.tagsFor(tr)
 	title := tr.Title
 	startedAt := tr.DownloadStartedAt

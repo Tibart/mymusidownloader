@@ -26,6 +26,7 @@ type Track struct {
 	SourceTitle       string    `json:"sourceTitle,omitempty"`
 	Artist            string    `json:"artist"`
 	Album             string    `json:"album"`
+	VariousArtists    bool      `json:"variousArtists"`
 	Genre             string    `json:"genre"`
 	Channel           string    `json:"channel,omitempty"`
 	UploadDate        string    `json:"uploadDate,omitempty"`
@@ -42,16 +43,19 @@ type Track struct {
 	SourceBitrateKbps int       `json:"sourceBitrateKbps,omitempty"`
 }
 
-func AlbumName(artist, album string) string {
+func AlbumName(title, album string) string {
 	album = strings.TrimSpace(album)
 	if album != "" {
 		return album
 	}
-	artist = strings.TrimSpace(artist)
-	if artist == "" {
-		return ""
+	return strings.TrimSpace(title)
+}
+
+func AlbumArtist(artist string, various bool) string {
+	if various {
+		return "Various Artists"
 	}
-	return artist + " Live"
+	return strings.TrimSpace(artist)
 }
 
 func (t Track) AudioPath(library string) string {
@@ -72,6 +76,7 @@ type Tags struct {
 	Artist      string
 	Genre       string
 	Album       string
+	AlbumArtist string
 	Channel     string
 	UploadDate  string
 	SourceURL   string
@@ -88,7 +93,8 @@ func (t Track) Tags() Tags {
 		Title:       t.Title,
 		Artist:      t.Artist,
 		Genre:       t.Genre,
-		Album:       AlbumName(t.Artist, t.Album),
+		Album:       AlbumName(t.Title, t.Album),
+		AlbumArtist: AlbumArtist(t.Artist, t.VariousArtists),
 		Channel:     t.Channel,
 		UploadDate:  t.UploadDate,
 		SourceURL:   t.URL,

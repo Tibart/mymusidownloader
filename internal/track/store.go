@@ -22,6 +22,93 @@ func (s *FileStore) ArtworkPath(videoID string) string {
 	return filepath.Join(s.dir, videoID+".jpg")
 }
 
+func (s *FileStore) ArtworkSourcePath(videoID string) string {
+	return filepath.Join(s.dir, videoID+".source.jpg")
+}
+
+func (s *FileStore) Genres() []string {
+	path := filepath.Join(s.dir, "genres.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return s.seedGenres()
+	}
+	var index struct {
+		Genres []string `json:"genres"`
+	}
+	if err := json.Unmarshal(data, &index); err != nil {
+		return s.seedGenres()
+	}
+	return uniqueSorted(index.Genres)
+}
+
+func (s *FileStore) RememberGenre(genre string) {
+	genre = strings.TrimSpace(genre)
+	if genre == "" {
+		return
+	}
+	genres := append(s.Genres(), genre)
+	unique := uniqueSorted(genres)
+	body, err := json.MarshalIndent(struct {
+		Genres []string `json:"genres"`
+	}{Genres: unique}, "", "  ")
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(filepath.Join(s.dir, "genres.json"), body, 0o644)
+}
+
+func (s *FileStore) seedGenres() []string {
+	found := []string{}
+	entries, err := os.ReadDir(s.dir)
+	if err != nil {
+		return nil
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") || entry.Name() == "genres.json" {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(s.dir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		var tr Track
+		if err := json.Unmarshal(data, &tr); err != nil {
+			continue
+		}
+		if strings.TrimSpace(tr.Genre) != "" {
+			found = append(found, strings.TrimSpace(tr.Genre))
+		}
+	}
+	unique := uniqueSorted(found)
+	if len(unique) == 0 {
+		return nil
+	}
+	body, err := json.MarshalIndent(struct {
+		Genres []string `json:"genres"`
+	}{Genres: unique}, "", "  ")
+	if err == nil {
+		_ = os.WriteFile(filepath.Join(s.dir, "genres.json"), body, 0o644)
+	}
+	return unique
+}
+
+func uniqueSorted(values []string) []string {
+	seen := map[string]string{}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		seen[strings.ToLower(value)] = value
+	}
+	out := make([]string, 0, len(seen))
+	for _, value := range seen {
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
+}
+
 func (s *FileStore) LoadAll() ([]Track, error) {
 	entries, err := os.ReadDir(s.dir)
 	if err != nil {

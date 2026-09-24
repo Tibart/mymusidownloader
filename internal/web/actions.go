@@ -13,7 +13,8 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request, videoID stri
 		Title  string `json:"title"`
 		Artist string `json:"artist"`
 		Genre  string `json:"genre"`
-		Album  string `json:"album"`
+		Album          string `json:"album"`
+		VariousArtists bool   `json:"variousArtists"`
 	}{}
 	if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -29,8 +30,9 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request, videoID stri
 		payload.Artist = r.FormValue("artist")
 		payload.Genre = r.FormValue("genre")
 		payload.Album = r.FormValue("album")
+		payload.VariousArtists = r.FormValue("variousArtists") == "true"
 	}
-	tr, err := s.app.Update(videoID, payload.Title, payload.Artist, payload.Genre, payload.Album)
+	tr, err := s.app.Update(videoID, payload.Title, payload.Artist, payload.Genre, payload.Album, payload.VariousArtists)
 	if err != nil {
 		writeTrackError(w, r, err)
 		return

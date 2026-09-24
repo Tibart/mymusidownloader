@@ -14,13 +14,14 @@ import (
 
 type App interface {
 	Trigger(ctx context.Context, input string) (track.StartResult, error)
-	Update(videoID, title, artist, genre, album string) (track.Track, error)
+	Update(videoID, title, artist, genre, album string, variousArtists bool) (track.Track, error)
 	Cancel(videoID string) (track.Track, error)
 	Restart(ctx context.Context, videoID string) (track.StartResult, error)
 	Convert(ctx context.Context, videoID string, equivalent bool) (track.Track, error)
 	Delete(videoID string) error
 	Recent() ([]track.Track, bool)
 	ArtworkPath(videoID string) (string, bool)
+	Genres() []string
 }
 
 var videoIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)
@@ -63,7 +64,8 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		Now     time.Time
 		Notice  string
 		Version string
-	}{Tracks: views, Refresh: refresh, Now: time.Now(), Notice: noticeFromQuery(r), Version: version.Current}
+		Genres  []string
+	}{Tracks: views, Refresh: refresh, Now: time.Now(), Notice: noticeFromQuery(r), Version: version.Current, Genres: s.app.Genres()}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.tmpl.Execute(w, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

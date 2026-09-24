@@ -1,11 +1,11 @@
 [Unit]
-Description=My Musi Downloader
+Description=Music downloader
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=musi
+User=app
 Group=media
 ExecStart=/usr/local/bin/mymusidownloader -config /etc/mymusidownloader/config.json
 Restart=on-failure

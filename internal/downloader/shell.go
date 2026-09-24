@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -191,7 +192,7 @@ func metadataArgs(tags track.Tags) []string {
 	pairs := [][2]string{
 		{"title", tags.Title},
 		{"artist", tags.Artist},
-		{"album_artist", tags.Artist},
+		{"album_artist", tags.AlbumArtist},
 		{"genre", tags.Genre},
 		{"album", tags.Album},
 		{"date", tags.UploadDate},
@@ -331,6 +332,36 @@ func bitrateKbps(info ytDLPInfo) int {
 	return 0
 }
 
+func artworkSource(displayPath string) string {
+	if displayPath == "" {
+		return ""
+	}
+	candidate := strings.TrimSuffix(displayPath, ".jpg") + ".source.jpg"
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate
+	}
+	return displayPath
+}
+
+func fontFile() string {
+	candidates := []string{
+		"/usr/share/fonts/liberation/LiberationSans-Bold.ttf",
+		"/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+		"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+		"/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+	}
+	for _, path := range candidates {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return path
+		}
+	}
+	out, err := exec.Command("fc-match", "-f", "%{file}", "sans:bold").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
 func findThumbnail(library, videoID string) string {
 	for _, ext := range []string{".jpg", ".jpeg", ".png", ".webp"} {
 		path := filepath.Join(library, videoID+ext)
@@ -343,10 +374,15 @@ func findThumbnail(library, videoID string) string {
 
 func (t FFmpegMediaTool) labeledArtwork(ctx context.Context, tags track.Tags) (string, func()) {
 	nop := func() {}
-	if tags.ArtworkPath == "" || strings.TrimSpace(tags.Album) == "" {
+	label := strings.TrimSpace(tags.Artist)
+	if label == "" {
+		label = strings.TrimSpace(tags.Album)
+	}
+	source := artworkSource(tags.ArtworkPath)
+	if tags.ArtworkPath == "" || label == "" {
 		return tags.ArtworkPath, nop
 	}
-	if _, err := os.Stat(tags.ArtworkPath); err != nil {
+	if _, err := os.Stat(source); err != nil {
 		return tags.ArtworkPath, nop
 	}
 	tmp, err := os.CreateTemp("", "cover-*.jpg")
@@ -354,17 +390,17 @@ func (t FFmpegMediaTool) labeledArtwork(ctx context.Context, tags track.Tags) (s
 		return tags.ArtworkPath, nop
 	}
 	tmp.Close()
-	if err := t.labelArtwork(ctx, tags.ArtworkPath, tags.Album, tmp.Name()); err != nil {
+	if err := t.LabelArtwork(ctx, source, label, tmp.Name()); err != nil {
 		_ = os.Remove(tmp.Name())
 		return tags.ArtworkPath, nop
 	}
 	return tmp.Name(), func() { _ = os.Remove(tmp.Name()) }
 }
 
-func (t FFmpegMediaTool) labelArtwork(ctx context.Context, inputPath, album, outputPath string) error {
-	font := "/usr/share/fonts/liberation/LiberationSans-Bold.ttf"
-	if _, err := os.Stat(font); err != nil {
-		return err
+func (t FFmpegMediaTool) LabelArtwork(ctx context.Context, inputPath, album, outputPath string) error {
+	font := fontFile()
+	if font == "" {
+		return errors.New("no font for cover text")
 	}
 	lines := albumLines(album)
 	boxY, boxH := "ih*0.78", "ih*0.16"
@@ -447,7 +483,7 @@ func artworkCodecArgs(artworkPath string) []string {
 	if _, err := os.Stat(artworkPath); err != nil {
 		return nil
 	}
-	return []string{"-c:v", "mjpeg", "-disposition:v:0", "attached_pic"}
+	return []string{"-c:v", "mjpeg", "-disposition:v:0", "attached_pic", "-metadata:s:v", "comment=Cover (front)"}
 }
 
 func findDownloadedFile(library, videoID string) (string, error) {

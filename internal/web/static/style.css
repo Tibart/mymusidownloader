@@ -126,6 +126,20 @@ button:active { transform: translateY(1px); }
 
 .meta { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.4rem; }
 .title-input { font-size: 1rem; font-weight: 600; }
+.check { display: flex; align-items: center; gap: 0.4rem; color: var(--muted); font-size: 0.85rem; }
+.check input { width: auto; }
+.track-top { display: flex; gap: 0.75rem; align-items: center; }
+.beside { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.album { grid-column: 1 / -1; }
+.genre-field { position: relative; }
+.genre-list {
+  position: static; z-index: 5; left: auto; right: auto; top: auto;
+  margin: 0.35rem 0 0; padding: 0.25rem 0; list-style: none;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  max-height: 12rem; overflow: auto;
+}
+.genre-list li { padding: 0.55rem 0.7rem; }
+.genre-list li:active, .genre-list li:hover { background: var(--border); }
 .field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
 .field-grid input { font-size: 0.85rem; }
 .info-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; font-size: 0.8rem; color: var(--muted); }
@@ -156,3 +170,6 @@ footer {
 @media (min-width: 641px) and (max-width: 900px) {
   .field-grid { grid-template-columns: 1fr 1fr 1fr; }
 }
+
+input, select, textarea { font-size: 16px; }
+select { width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem; }

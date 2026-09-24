@@ -37,7 +37,7 @@ func (s *stubApp) Trigger(ctx context.Context, input string) (track.StartResult,
 	return s.triggerResult, nil
 }
 
-func (s *stubApp) Update(videoID, title, artist, genre, album string) (track.Track, error) {
+func (s *stubApp) Update(videoID, title, artist, genre, album string, variousArtists bool) (track.Track, error) {
 	s.editVideoID = videoID
 	s.editTitle = title
 	s.editArtist = artist
@@ -61,6 +61,10 @@ func (s *stubApp) Convert(ctx context.Context, videoID string, equivalent bool) 
 func (s *stubApp) Restart(ctx context.Context, videoID string) (track.StartResult, error) {
 	s.restartVideo = videoID
 	return s.triggerResult, nil
+}
+
+func (s *stubApp) Genres() []string {
+	return nil
 }
 
 func (s *stubApp) Recent() ([]track.Track, bool) {
@@ -307,7 +311,7 @@ func TestRecentPageAppShellMeta(t *testing.T) {
 	body := rec.Body.String()
 
 	for _, want := range []string{
-		`name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"`,
+		`name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"`,
 		`name="apple-mobile-web-app-capable" content="yes"`,
 		`rel="manifest" href="/static/manifest.json"`,
 		`name="theme-color" media="(prefers-color-scheme: dark)"`,

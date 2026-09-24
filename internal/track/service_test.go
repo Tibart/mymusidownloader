@@ -118,6 +118,10 @@ func (f *fakeMediaTool) PrepareArtwork(ctx context.Context, inputPath, outputPat
 	return f.Remux(ctx, inputPath, outputPath)
 }
 
+func (f *fakeMediaTool) LabelArtwork(ctx context.Context, inputPath, album, outputPath string) error {
+	return f.Remux(ctx, inputPath, outputPath)
+}
+
 func (f *fakeMediaTool) Remux(ctx context.Context, inputPath, outputPath string) error {
 	data, err := os.ReadFile(inputPath)
 	if err != nil {
@@ -361,7 +365,7 @@ func TestServiceCodecHandlingAndTagEdits(t *testing.T) {
 				}
 			}
 
-			if _, err := service.Update("dQw4w9WgXcQ", "Edited Title", "Edited Artist", "Edited Genre", ""); err != nil {
+			if _, err := service.Update("dQw4w9WgXcQ", "Edited Title", "Edited Artist", "Edited Genre", "", false); err != nil {
 				t.Fatal(err)
 			}
 			if mediaTool.ConvertCount() != tt.wantConvertCount {
