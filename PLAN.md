@@ -4,7 +4,7 @@ Personal Go daemon. Phone on Tailscale starts a YouTube audio download. File sta
 
 ## Run
 
-- Example host: `music.example`. Example user: `app`. Example group: `media`.
+- Example host: `music.example`. Example user: `musi`. Example group: `media`.
 - Config: `/etc/mymusidownloader/config.json`
 - Example library: `/mnt/music/download`. Example metadata: `/mnt/music/data`. Either missing or not writable: exit, no fallback disk.
 - Dev library default: `download/` in the repo

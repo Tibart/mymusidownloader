@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=app
+User=musi
 Group=media
 ExecStart=/usr/local/bin/mymusidownloader -config /etc/mymusidownloader/config.json
 Restart=on-failure

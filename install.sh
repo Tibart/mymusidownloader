@@ -89,7 +89,7 @@ Edit /etc/mymusidownloader/config.json before the first start:
   ytDlpPath     /usr/local/bin/yt-dlp
   ffmpegPath    /usr/bin/ffmpeg
 
-The user is set in the unit file, not in the JSON file. The example unit uses User=app and Group=media. Change those to the account that can write the two directories.
+The user is set in the unit file, not in the JSON file. The example unit uses User=musi and Group=media. Change those to the account that can write the two directories.
 
 Then:
   sudo systemctl enable --now mymusidownloader

@@ -75,7 +75,7 @@ _Avoid_: Video id, slug
 
 - "Status API" was proposed, then dropped. Progress after the **Start result** is visible only on the **Recent page**, including rows that do not have an MP3 yet.
 - "Date" in the **File name** is the download date, not the video's publish date.
-- Documentation uses hypothetical names only: host `music.example`, user `app`, group `media`, library `/mnt/music/download`, metadata `/mnt/music/data`.
+- Documentation uses hypothetical names only: host `music.example`, user `musi`, group `media`, library `/mnt/music/download`, metadata `/mnt/music/data`.
 - `yt-dlp` on the Pi is the current upstream aarch64 binary, not the distro package. `ffmpeg` may come from apt.
 - A new build is cross-compiled to `linux/arm64` and copied to the Pi. The Pi does not build it.
 - If the configured library or metadata directory is missing or not writable, the daemon does not start and does not write somewhere else.
