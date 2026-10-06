@@ -21,7 +21,7 @@ Both directories must exist before start. The process exits if either one is mis
 
 ```sh
 mkdir -p download metadata
-go run ./cmd/mymusidownloader -config packaging/config.sample.json
+go run ./cmd/mymusidownloader --config packaging/config.sample.json
 ```
 
 Open `http://127.0.0.1:6874/`. That sample config binds to localhost, so another machine cannot open it.
@@ -98,7 +98,7 @@ The sample values are for a local run. For the service, set `libraryPath` to `/s
 | --- | --- | --- |
 | `User` | `musi` | Account the process runs as. |
 | `Group` | `media` | Group used for write access to the data directories. |
-| `ExecStart` | `/usr/local/bin/mymusidownloader -config /etc/mymusidownloader/config.json` | Binary and the JSON config it reads. |
+| `ExecStart` | `/usr/local/bin/mymusidownloader --config /etc/mymusidownloader/config.json` | Binary and the JSON config it reads. `-c` is the short form. |
 | `Restart` | `on-failure` | systemd starts it again after a crash. |
 
 ## What a download stores

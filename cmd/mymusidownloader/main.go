@@ -22,7 +22,9 @@ func main() {
 	var configPath string
 	var showVersion bool
 	flag.StringVar(&configPath, "config", "", "path to config.json")
+	flag.StringVar(&configPath, "c", "", "path to config.json")
 	flag.BoolVar(&showVersion, "version", false, "print name and version, then exit")
+	flag.BoolVar(&showVersion, "v", false, "print name and version, then exit")
 	flag.Parse()
 	if showVersion {
 		fmt.Printf("mymusidownloader %s\n", version.Current)

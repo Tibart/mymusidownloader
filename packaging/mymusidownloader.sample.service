@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 User=musi
 Group=media
-ExecStart=/usr/local/bin/mymusidownloader -config /etc/mymusidownloader/config.json
+ExecStart=/usr/local/bin/mymusidownloader --config /etc/mymusidownloader/config.json
 Restart=on-failure
 RestartSec=5
 

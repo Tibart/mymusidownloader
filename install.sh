@@ -38,9 +38,12 @@ if [ -z "$config_file" ]; then
   config_file="$tmp/config.sample.json"
   curl -fsSL "$repo/packaging/config.sample.json" -o "$config_file"
 fi
+release_number=""
 if [ -z "$binary_file" ]; then
   binary_file="$tmp/mymusidownloader"
-  curl -fsSL "$release" -o "$binary_file"
+  release_url="$(curl -fsSL -o "$binary_file" -w '%{url_effective}' "$release")"
+  release_number="$(printf '%s
+' "$release_url" | sed -n 's|.*/download/v\([^/]*\)/.*|\1|p')"
 fi
 
 if [ ! -f "$service_file" ] || [ ! -f "$config_file" ] || [ ! -f "$binary_file" ]; then
@@ -54,16 +57,16 @@ if [ -e "$bin_dest" ] || [ -e "$unit_dest" ] || [ -e "$config_dest" ]; then
   updating=1
 fi
 if [ -x "$bin_dest" ]; then
-  previous_version="$("$bin_dest" -version 2>/dev/null || true)"
+  previous_version="$("$bin_dest" --version 2>/dev/null || true)"
 fi
 
 install -d -m 755 /etc/mymusidownloader /usr/local/bin
 install -m 755 "$binary_file" "$bin_dest"
-installed_version="$("$bin_dest" -version 2>/dev/null || true)"
+installed_version="$(printf '%s' "$("$bin_dest" --version 2>/dev/null || true)" | tr -d '\r\n')"
 installed_number="${installed_version#mymusidownloader }"
 previous_number="${previous_version#mymusidownloader }"
 if [ -z "$installed_number" ] || [ "$installed_number" = "$installed_version" ]; then
-  installed_number="unknown"
+  installed_number="${release_number:-unknown}"
 fi
 if [ -z "$previous_number" ] || [ "$previous_number" = "$previous_version" ]; then
   previous_number="unknown"
