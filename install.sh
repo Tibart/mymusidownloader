@@ -1,23 +1,34 @@
 #!/bin/sh
-# Install the systemd unit and config file.
-# Local:  sudo ./install.sh [service-file] [config-file]
+# Install or update the daemon, unit file, and config.
+# Local:  sudo ./install.sh [service-file] [config-file] [binary]
 # Remote: curl -fsSL https://raw.githubusercontent.com/Tibart/mymusidownloader/main/install.sh | sudo sh
 set -eu
 
 repo="${MYMUSIDOWNLOADER_REPO:-https://raw.githubusercontent.com/Tibart/mymusidownloader/main}"
+release="${MYMUSIDOWNLOADER_RELEASE:-https://github.com/Tibart/mymusidownloader/releases/latest/download/mymusidownloader}"
 unit_dest="/etc/systemd/system/mymusidownloader.service"
 config_dest="/etc/mymusidownloader/config.json"
+bin_dest="/usr/local/bin/mymusidownloader"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Run as root: sudo sh install.sh" >&2
   exit 1
 fi
 
+case "$(uname -m)" in
+  aarch64|arm64) ;;
+  *)
+    echo "The release binary is linux/arm64. This machine is $(uname -m)." >&2
+    exit 1
+    ;;
+esac
+
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 service_file="${1:-}"
 config_file="${2:-}"
+binary_file="${3:-}"
 
 if [ -z "$service_file" ]; then
   service_file="$tmp/mymusidownloader.service"
@@ -27,13 +38,25 @@ if [ -z "$config_file" ]; then
   config_file="$tmp/config.sample.json"
   curl -fsSL "$repo/packaging/config.sample.json" -o "$config_file"
 fi
+if [ -z "$binary_file" ]; then
+  binary_file="$tmp/mymusidownloader"
+  curl -fsSL "$release" -o "$binary_file"
+fi
 
-if [ ! -f "$service_file" ] || [ ! -f "$config_file" ]; then
-  echo "Need a service file and a config file." >&2
+if [ ! -f "$service_file" ] || [ ! -f "$config_file" ] || [ ! -f "$binary_file" ]; then
+  echo "Need a service file, a config file, and a binary." >&2
   exit 1
 fi
 
-install -d -m 755 /etc/mymusidownloader
+updating=0
+if [ -e "$bin_dest" ] || [ -e "$unit_dest" ] || [ -e "$config_dest" ]; then
+  updating=1
+  echo "Existing install found. This is an update."
+  echo "The binary $bin_dest will be overwritten."
+fi
+
+install -d -m 755 /etc/mymusidownloader /usr/local/bin
+install -m 755 "$binary_file" "$bin_dest"
 install -m 644 "$service_file" "$unit_dest"
 if [ -f "$config_dest" ]; then
   echo "Left existing $config_dest in place."
@@ -43,9 +66,20 @@ else
 fi
 systemctl daemon-reload
 
+if [ "$updating" -eq 1 ] && systemctl is-active --quiet mymusidownloader; then
+  systemctl restart mymusidownloader
+  echo "Restarted mymusidownloader."
+  exit 0
+fi
+
+if [ "$updating" -eq 1 ]; then
+  echo "Binary replaced. Start it with: sudo systemctl restart mymusidownloader"
+  exit 0
+fi
+
 cat <<'EOF'
 
-Installed the service file. The service was not started.
+Installed the binary and the service file. The service was not started.
 
 Edit /etc/mymusidownloader/config.json before the first start:
   libraryPath   directory for audio files, must already exist and be writable

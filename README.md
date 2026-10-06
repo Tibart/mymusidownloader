@@ -43,7 +43,7 @@ go run ./cmd/mymusidownloader -config packaging/config.sample.json
 
 ## Install the service files
 
-This copies the unit file and the sample config. It does not start the service.
+A first run installs the binary, the unit file, and the sample config. It does not start the service. A later run says it is an update, overwrites the binary, and restarts the service if it is already running. The existing config file is left in place.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/Tibart/mymusidownloader/main/install.sh | sudo sh
