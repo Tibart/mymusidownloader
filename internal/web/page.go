@@ -27,10 +27,7 @@ func parsePageTemplate() (*template.Template, error) {
 			return false
 		},
 		"formatDate": func(t track.Track) string {
-			when := t.DownloadStartedAt
-			if when.IsZero() {
-				when = t.TouchedAt
-			}
+			when := t.CreatedOn()
 			if when.IsZero() {
 				return ""
 			}

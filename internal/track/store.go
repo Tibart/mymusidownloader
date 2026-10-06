@@ -134,7 +134,7 @@ func (s *FileStore) LoadAll() ([]Track, error) {
 		tracks = append(tracks, tr)
 	}
 	sort.Slice(tracks, func(i, j int) bool {
-		return tracks[i].TouchedAt.After(tracks[j].TouchedAt)
+		return tracks[i].CreatedOn().After(tracks[j].CreatedOn())
 	})
 	return tracks, nil
 }
@@ -173,10 +173,10 @@ func RecentTracks(all map[string]*Track, since time.Time) []Track {
 		tracks = append(tracks, *tr)
 	}
 	sort.Slice(tracks, func(i, j int) bool {
-		if tracks[i].TouchedAt.Equal(tracks[j].TouchedAt) {
+		if tracks[i].CreatedOn().Equal(tracks[j].CreatedOn()) {
 			return tracks[i].VideoID < tracks[j].VideoID
 		}
-		return tracks[i].TouchedAt.After(tracks[j].TouchedAt)
+		return tracks[i].CreatedOn().After(tracks[j].CreatedOn())
 	})
 	return tracks
 }

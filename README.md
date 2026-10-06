@@ -36,10 +36,26 @@ From the repo root:
 
 ```sh
 mkdir -p download metadata
-go run ./cmd/mymusidownloader -config config.sample.json
+go run ./cmd/mymusidownloader -config packaging/config.sample.json
 ```
 
-`config.sample.json` binds to `127.0.0.1:6874`, writes audio to `./download`, and writes JSON to `./metadata`. Open `http://127.0.0.1:6874/`. Leave `bind` empty only if you want the Tailscale address.
+`packaging/config.sample.json` binds to `127.0.0.1:6874`, writes audio to `./download`, and writes JSON to `./metadata`. Open `http://127.0.0.1:6874/`. Leave `bind` empty only if you want the private-network address.
+
+## Install the service files
+
+This copies the unit file and the sample config. It does not start the service.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Tibart/mymusidownloader/main/install.sh | sudo sh
+```
+
+From a checkout, pass the two files:
+
+```sh
+sudo sh install.sh packaging/mymusidownloader.sample.service packaging/config.sample.json
+```
+
+The script ends with the config fields to edit.
 
 ## Install on the Pi
 
@@ -72,7 +88,7 @@ sudo chmod 2775 /mnt/music/download /mnt/music/data
 ```
 
 6. Write `/etc/mymusidownloader/config.json` with the example paths below, or your own. Do not set `bind` if the page should be reached only on the private network.
-7. Copy `systemd/mymusidownloader.service` to `/etc/systemd/system/mymusidownloader.service`.
+7. Run `install.sh`, or copy `packaging/mymusidownloader.sample.service` to `/etc/systemd/system/mymusidownloader.service`.
 8. Start it:
 
 ```sh
@@ -88,7 +104,7 @@ systemctl status mymusidownloader
 | What you see | What it means | What to do |
 | --- | --- | --- |
 | `status=203/EXEC` | The binary cannot be executed. | `file /usr/local/bin/mymusidownloader` must say `ARM aarch64`. Then `sudo chmod 755` that file. `scp` often drops the execute bit. |
-| `library path is not writable` | The service user cannot create a file there. The directory can still exist. | `sudo -u app touch /mnt/music/download/.write-test`. On exFAT, `chown` fails. Remount with `gid` set to the `media` group and `dmask=0002`. |
+| `library path is not writable` | The service user cannot create a file there. The directory can still exist. | `sudo -u app touch /mnt/music/download/.write-test`. On exFAT, `chown` fails. Remount with `gid` set to the writing group and `dmask=0002`. |
 | `chown: Operation not permitted` | The disk is exFAT or NTFS. | Do not use `chown`. Set `uid` and `gid` in the mount options. |
 | Page works on the phone, not in a desktop browser | The desktop is not on the same private network as the daemon. | Join that network, then open `http://music.example:6874/`. A home-network name is not used unless `bind` includes that address. |
 | Browser shows nothing on the Tailscale name | The browser switched to HTTPS. | Type `http://` and port `6874`. There is no HTTPS listener. |

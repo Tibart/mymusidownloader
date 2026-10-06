@@ -37,10 +37,26 @@ type Track struct {
 	FileName          string    `json:"fileName,omitempty"`
 	Error             string    `json:"error,omitempty"`
 	TouchedAt         time.Time `json:"touchedAt"`
+	CreatedAt         time.Time `json:"createdAt,omitempty"`
 	DownloadStartedAt time.Time `json:"downloadStartedAt,omitempty"`
 	SourceCodec       string    `json:"sourceCodec,omitempty"`
 	StoredCodec       string    `json:"storedCodec,omitempty"`
 	SourceBitrateKbps int       `json:"sourceBitrateKbps,omitempty"`
+}
+
+func (t Track) CreatedOn() time.Time {
+	if !t.CreatedAt.IsZero() {
+		return t.CreatedAt
+	}
+	if !t.DownloadStartedAt.IsZero() {
+		return t.DownloadStartedAt
+	}
+	if len(t.FileName) >= 10 {
+		if parsed, err := time.Parse("2006-01-02", t.FileName[:10]); err == nil {
+			return parsed
+		}
+	}
+	return t.TouchedAt
 }
 
 func AlbumName(title, album string) string {

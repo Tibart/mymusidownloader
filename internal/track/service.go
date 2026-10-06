@@ -86,6 +86,12 @@ func NewService(library string, maxConcurrent int, store *FileStore, downloader 
 	}
 	for _, tr := range loaded {
 		copy := tr
+		if copy.CreatedAt.IsZero() {
+			copy.CreatedAt = copy.CreatedOn()
+			if err := svc.store.Save(copy); err != nil {
+				return nil, err
+			}
+		}
 		if copy.State == StateQueued || copy.State == StateDownloading {
 			copy.State = StateFailed
 			copy.Error = "interrupted by daemon restart"
@@ -136,6 +142,7 @@ func (s *Service) Trigger(_ context.Context, input string) (StartResult, error) 
 	tr := &Track{
 		VideoID:   target.VideoID,
 		URL:       target.URL,
+		CreatedAt: s.now(),
 		TouchedAt: s.now(),
 	}
 	s.tracks[tr.VideoID] = tr
