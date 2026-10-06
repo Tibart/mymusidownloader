@@ -49,18 +49,36 @@ if [ ! -f "$service_file" ] || [ ! -f "$config_file" ] || [ ! -f "$binary_file" 
 fi
 
 updating=0
+previous_version=""
 if [ -e "$bin_dest" ] || [ -e "$unit_dest" ] || [ -e "$config_dest" ]; then
   updating=1
-  echo "Existing install found. This is an update."
-  echo "The binary $bin_dest will be overwritten."
+fi
+if [ -x "$bin_dest" ]; then
+  previous_version="$("$bin_dest" -version 2>/dev/null || true)"
 fi
 
 install -d -m 755 /etc/mymusidownloader /usr/local/bin
 install -m 755 "$binary_file" "$bin_dest"
-install -m 644 "$service_file" "$unit_dest"
-if [ -f "$config_dest" ]; then
-  echo "Left existing $config_dest in place."
+installed_version="$("$bin_dest" -version 2>/dev/null || true)"
+installed_number="${installed_version#mymusidownloader }"
+previous_number="${previous_version#mymusidownloader }"
+if [ -z "$installed_number" ] || [ "$installed_number" = "$installed_version" ]; then
+  installed_number="unknown"
+fi
+if [ -z "$previous_number" ] || [ "$previous_number" = "$previous_version" ]; then
+  previous_number="unknown"
+fi
+if [ "$updating" -eq 1 ]; then
+  if [ "$previous_number" = "unknown" ] || [ "$previous_number" = "$installed_number" ]; then
+    echo "Updated mymusidownloader to $installed_number."
+  else
+    echo "Updated mymusidownloader from version $previous_number to $installed_number."
+  fi
 else
+  echo "Installed mymusidownloader version $installed_number."
+fi
+install -m 644 "$service_file" "$unit_dest"
+if [ ! -f "$config_dest" ]; then
   install -m 644 "$config_file" "$config_dest"
   echo "Installed $config_dest"
 fi

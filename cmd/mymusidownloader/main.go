@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -19,8 +20,14 @@ import (
 
 func main() {
 	var configPath string
+	var showVersion bool
 	flag.StringVar(&configPath, "config", "", "path to config.json")
+	flag.BoolVar(&showVersion, "version", false, "print name and version, then exit")
 	flag.Parse()
+	if showVersion {
+		fmt.Printf("mymusidownloader %s\n", version.Current)
+		return
+	}
 
 	cfg, err := config.Load(configPath)
 	if err != nil {

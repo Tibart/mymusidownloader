@@ -28,7 +28,7 @@ Open `http://127.0.0.1:6874/`. That sample config binds to localhost, so another
 
 ## Install as a service
 
-A first run installs the binary, the unit file, and the sample config. It does not start the service. A later run says it is an update, overwrites the binary, and restarts the service if it is already running. An existing config file is left alone.
+A first run installs the binary, the unit file, and the sample config. It does not start the service. A later run says it is an update, overwrites the binary, and restarts the service if it is already running.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/Tibart/mymusidownloader/main/install.sh | sudo sh
