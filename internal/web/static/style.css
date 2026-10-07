@@ -113,6 +113,7 @@ button:active { transform: translateY(1px); }
 .track[data-state="cancelled"] { border-left-color: var(--muted); }
 
 .art { flex: 0 0 auto; width: 56px; height: 56px; }
+.art a { display: block; }
 .art img, .art-placeholder { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; display: block; }
 .art-placeholder {
   background: var(--bg);
@@ -147,9 +148,10 @@ button:active { transform: translateY(1px); }
 .filename { overflow-wrap: anywhere; }
 .error { color: var(--danger); font-size: 0.85rem; margin: 0; }
 
-.actions { flex: 1 1 100%; display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.side { display: flex; flex-direction: row; gap: 0.4rem; align-items: flex-start; flex: 0 0 auto; }
+.actions { display: flex; flex-direction: column; gap: 0.35rem; align-items: stretch; }
 .actions form { margin: 0; }
-.actions button { width: auto; white-space: nowrap; }
+.actions button { width: 100%; white-space: nowrap; }
 
 .empty { text-align: center; color: var(--muted); padding: 2rem 0; list-style: none; }
 
@@ -161,10 +163,7 @@ footer {
 }
 
 @media (max-width: 640px) {
-  .track { flex-wrap: wrap; }
   .field-grid { grid-template-columns: 1fr 1fr; }
-  .actions { flex-direction: row; flex-wrap: wrap; min-width: 0; width: 100%; }
-  .actions button { width: auto; flex: 1 1 auto; }
 }
 
 @media (min-width: 641px) and (max-width: 900px) {

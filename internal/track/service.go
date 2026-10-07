@@ -256,15 +256,20 @@ func (s *Service) Update(videoID, title, artist, genre, album string, variousArt
 	updated.VariousArtists = variousArtists
 	s.store.RememberGenre(genre)
 	updated.TouchedAt = s.now()
-	path := ""
+	oldName := ""
 	if s.hasAudioFileLocked(tr) {
-		path = tr.AudioPath(s.library)
+		oldName = tr.FileName
 	}
 	s.mu.Unlock()
 
 	s.refreshArtwork(&updated)
-	if path != "" {
-		if err := s.mediaTool.WriteTags(context.Background(), path, s.tagsFor(&updated)); err != nil {
+	if oldName != "" {
+		newName, err := s.placeSavedFile(oldName, &updated)
+		if err != nil {
+			return Track{}, err
+		}
+		updated.FileName = newName
+		if err := s.mediaTool.WriteTags(context.Background(), updated.AudioPath(s.library), s.tagsFor(&updated)); err != nil {
 			return Track{}, err
 		}
 	}
@@ -280,6 +285,7 @@ func (s *Service) Update(videoID, title, artist, genre, album string, variousArt
 	current.Genre = updated.Genre
 	current.Album = updated.Album
 	current.VariousArtists = updated.VariousArtists
+	current.FileName = updated.FileName
 	current.TouchedAt = updated.TouchedAt
 	if err := s.store.Save(*current); err != nil {
 		return Track{}, err
@@ -512,6 +518,7 @@ func (s *Service) failRun(videoID, path string, cancelErr, runErr error) {
 	_ = s.removePartials(videoID)
 	if path != "" {
 		_ = os.Remove(path)
+		removeEmptyParents(s.library, filepath.Dir(path))
 	}
 
 	s.mu.Lock()
@@ -599,8 +606,10 @@ func (s *Service) storeMedia(ctx context.Context, videoID string, downloaded Dow
 	}
 
 	if media.KeepSourceCodec(codec) {
-		candidateName := media.BuildFinalName(startedAt.Local(), title, videoID, ext, media.CandidateExistsInDir(s.library))
-		finalPath := filepath.Join(s.library, candidateName)
+		candidateName, finalPath, err := s.audioDestination(tags, startedAt, title, videoID, ext)
+		if err != nil {
+			return "", "", err
+		}
 		sourceExt := strings.TrimPrefix(strings.ToLower(filepath.Ext(downloaded.Path)), ".")
 		if sourceExt != "" && sourceExt != ext {
 			if err := s.mediaTool.Remux(ctx, downloaded.Path, finalPath); err != nil {
@@ -613,13 +622,16 @@ func (s *Service) storeMedia(ctx context.Context, videoID string, downloaded Dow
 		}
 		if err := s.mediaTool.WriteTags(ctx, finalPath, tags); err != nil {
 			_ = os.Remove(finalPath)
+			removeEmptyParents(s.library, filepath.Dir(finalPath))
 			return "", "", fmt.Errorf("write tags: %w", err)
 		}
 		return candidateName, codec, nil
 	}
 
-	candidateName := media.BuildFinalName(startedAt.Local(), title, videoID, "opus", media.CandidateExistsInDir(s.library))
-	finalPath := filepath.Join(s.library, candidateName)
+	candidateName, finalPath, err := s.audioDestination(tags, startedAt, title, videoID, "opus")
+	if err != nil {
+		return "", "", err
+	}
 	bitrate := downloaded.BitrateKbps
 	if bitrate <= 0 {
 		return "", "", errUnknownBitrate
@@ -688,8 +700,19 @@ func (s *Service) Convert(_ context.Context, videoID string, equivalent bool) (T
 func (s *Service) finishConvert(videoID, sourcePath, title string, startedAt time.Time, bitrate int, tags Tags) {
 	tags.Codec = "aac"
 	tags.BitrateKbps = bitrate
-	candidateName := media.BuildFinalName(startedAt.Local(), title, videoID, "m4a", media.CandidateExistsInDir(s.library))
-	finalPath := filepath.Join(s.library, candidateName)
+	candidateName, finalPath, err := s.audioDestination(tags, startedAt, title, videoID, "m4a")
+	if err != nil {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		tr, ok := s.tracks[videoID]
+		if ok {
+			tr.State = StateDone
+			tr.Error = err.Error()
+			tr.TouchedAt = s.now()
+			_ = s.store.Save(*tr)
+		}
+		return
+	}
 	if err := s.mediaTool.ConvertToAAC(context.Background(), sourcePath, finalPath, bitrate, tags); err != nil {
 		_ = os.Remove(finalPath)
 		s.mu.Lock()
@@ -730,8 +753,10 @@ func (s *Service) storeAAC(ctx context.Context, videoID string, downloaded Downl
 	if s.stopped(videoID) || ctx.Err() != nil {
 		return "", "", errStopped
 	}
-	candidateName := media.BuildFinalName(startedAt.Local(), title, videoID, "m4a", media.CandidateExistsInDir(s.library))
-	finalPath := filepath.Join(s.library, candidateName)
+	candidateName, finalPath, err := s.audioDestination(tags, startedAt, title, videoID, "m4a")
+	if err != nil {
+		return "", "", err
+	}
 	tags.Codec = "aac"
 	tags.BitrateKbps = bitrate
 	if err := s.mediaTool.ConvertToAAC(ctx, downloaded.Path, finalPath, bitrate, tags); err != nil {
@@ -743,6 +768,55 @@ func (s *Service) storeAAC(ctx context.Context, videoID string, downloaded Downl
 		return "", "", fmt.Errorf("remove source file: %w", err)
 	}
 	return candidateName, "aac", nil
+}
+
+func (s *Service) audioDestination(tags Tags, startedAt time.Time, title, videoID, ext string) (string, string, error) {
+	folder := media.LibraryFolder(tags.AlbumArtist, tags.Album)
+	if err := os.MkdirAll(filepath.Join(s.library, folder), 0o755); err != nil {
+		return "", "", fmt.Errorf("create album folder: %w", err)
+	}
+	name := media.BuildFinalName(startedAt.Local(), title, videoID, ext, func(candidate string) bool {
+		return media.FileExists(filepath.Join(s.library, folder, candidate))
+	})
+	relative := filepath.ToSlash(filepath.Join(folder, name))
+	return relative, filepath.Join(s.library, folder, name), nil
+}
+
+func (s *Service) placeSavedFile(currentName string, tr *Track) (string, error) {
+	tags := tr.Tags()
+	folder := media.LibraryFolder(tags.AlbumArtist, tags.Album)
+	ext := strings.TrimPrefix(filepath.Ext(currentName), ".")
+	src := filepath.Join(s.library, currentName)
+	name := media.BuildFinalName(tr.CreatedOn().Local(), tr.Title, tr.VideoID, ext, func(candidate string) bool {
+		full := filepath.Join(s.library, folder, candidate)
+		return media.FileExists(full) && filepath.Clean(full) != filepath.Clean(src)
+	})
+	dest := filepath.Join(s.library, folder, name)
+	if filepath.Clean(src) == filepath.Clean(dest) {
+		return filepath.ToSlash(filepath.Join(folder, name)), nil
+	}
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return "", fmt.Errorf("create album folder: %w", err)
+	}
+	if err := os.Rename(src, dest); err != nil {
+		return "", fmt.Errorf("move audio file: %w", err)
+	}
+	removeEmptyParents(s.library, filepath.Dir(src))
+	return filepath.ToSlash(filepath.Join(folder, name)), nil
+}
+
+func removeEmptyParents(library, dir string) {
+	library = filepath.Clean(library)
+	for {
+		dir = filepath.Clean(dir)
+		if dir == library || !strings.HasPrefix(dir, library+string(os.PathSeparator)) {
+			return
+		}
+		if err := os.Remove(dir); err != nil {
+			return
+		}
+		dir = filepath.Dir(dir)
+	}
 }
 
 func (s *Service) hasAudioFileLocked(tr *Track) bool {

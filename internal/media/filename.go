@@ -34,6 +34,19 @@ func PascalTitle(title string) string {
 	return b.String()
 }
 
+func FolderName(name string) string {
+	name = strings.TrimSpace(name)
+	name = strings.NewReplacer("/", "-", "\\", "-", ":", "-").Replace(name)
+	if name == "" || name == "." || name == ".." {
+		return "Unknown"
+	}
+	return name
+}
+
+func LibraryFolder(artist, album string) string {
+	return filepath.Join(FolderName(artist), FolderName(album))
+}
+
 func BuildFinalName(downloadDate time.Time, title, videoID, ext string, exists func(string) bool) string {
 	base := fmt.Sprintf("%s_%s", downloadDate.Format("2006-01-02"), PascalTitle(title))
 	candidate := base + "." + strings.TrimPrefix(ext, ".")

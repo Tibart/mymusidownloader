@@ -51,8 +51,9 @@ func (t Track) CreatedOn() time.Time {
 	if !t.DownloadStartedAt.IsZero() {
 		return t.DownloadStartedAt
 	}
-	if len(t.FileName) >= 10 {
-		if parsed, err := time.Parse("2006-01-02", t.FileName[:10]); err == nil {
+	base := filepath.Base(t.FileName)
+	if len(base) >= 10 {
+		if parsed, err := time.Parse("2006-01-02", base[:10]); err == nil {
 			return parsed
 		}
 	}

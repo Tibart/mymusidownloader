@@ -103,7 +103,7 @@ The sample values are for a local run. For the service, set `libraryPath` to `/s
 
 ## What a download stores
 
-The file is renamed to `{YYYY-MM-DD}_{PascalTitle}.{ext}` after the title is known. The date is the day the download started. A taken name gets the video id appended.
+The file is stored as `{Artist}/{Album}/{YYYY-MM-DD}_{PascalTitle}.{ext}`. The artist folder is `Various Artists` when that box is checked. The date is the day the download started. A taken name gets the video id appended. The YouTube URL is stored in the JSON record and in the file tags. The cover links to that URL.
 
 An empty album name becomes the title. Check Various Artists to write the album artist as `Various Artists`. Players group tracks only when both the album name and the album artist match.
 

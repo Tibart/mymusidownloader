@@ -641,6 +641,45 @@ func TestServiceArtworkPath(t *testing.T) {
 	}
 }
 
+func TestUpdateMovesFileIntoArtistAlbumFolder(t *testing.T) {
+	library := t.TempDir()
+	store := NewFileStore(library)
+	audioName := "2024-07-06_OldName.mp3"
+	if err := os.WriteFile(filepath.Join(library, audioName), []byte("audio"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	existing := Track{
+		VideoID:   "dQw4w9WgXcQ",
+		URL:       youtube.WatchURL("dQw4w9WgXcQ"),
+		Title:     "Old Name",
+		State:     StateDone,
+		FileName:  audioName,
+		CreatedAt: time.Date(2024, 7, 6, 0, 0, 0, 0, time.UTC),
+		TouchedAt: time.Now(),
+	}
+	if err := store.Save(existing); err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewService(library, 1, store, &fakeDownloader{}, &fakeMediaTool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr, err := service.Update("dQw4w9WgXcQ", "New Title", "Example Artist", "Pop", "Example Album", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "Example Artist/Example Album/2024-07-06_NewTitle.mp3"
+	if tr.FileName != want {
+		t.Fatalf("file name = %q, want %q", tr.FileName, want)
+	}
+	if _, err := os.Stat(filepath.Join(library, "Example Artist", "Example Album", "2024-07-06_NewTitle.mp3")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(library, audioName)); !os.IsNotExist(err) {
+		t.Fatalf("old file still present: %v", err)
+	}
+}
+
 func waitForState(t *testing.T, service *Service, videoID string, want State) {
 	t.Helper()
 	waitFor(t, func() bool {

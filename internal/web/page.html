@@ -34,31 +34,35 @@
     <ul class="tracks">
       {{range .Tracks}}
       <li class="track" data-state="{{.State}}">
-        <div class="actions">
-          {{if not (or (eq .State "queued") (eq .State "downloading") (eq .State "converting"))}}
-          <button form="edit-{{.VideoID}}" type="submit" class="primary">Save</button>
-          {{end}}
-          {{if or (eq .State "queued") (eq .State "downloading")}}
-          <form method="post" action="/tracks/{{.VideoID}}/cancel"><button type="submit">Cancel</button></form>
-          {{end}}
-          {{if or (eq .State "failed") (eq .State "cancelled")}}
-          <form method="post" action="/tracks/{{.VideoID}}/restart"><button type="submit">Restart</button></form>
-          {{end}}
-          {{if not (or (eq .State "queued") (eq .State "downloading") (eq .State "converting"))}}
-          <form method="post" action="/tracks/{{.VideoID}}/delete" onsubmit="return confirm('Delete this track?');"><button type="submit" class="danger">Delete</button></form>
-          {{end}}
-          {{if and (eq .State "done") (ne .StoredCodec "aac")}}
-          <form method="post" action="/tracks/{{.VideoID}}/convert">
-            <button type="submit" name="equivalent" value="true">AAC equivalent</button>
-          </form>
-          {{end}}
-        </div>
-        <div class="art">
-          {{if .HasArtwork}}
-          <img src="/tracks/{{.VideoID}}/artwork" alt="" loading="lazy">
-          {{else}}
-          <div class="art-placeholder" aria-hidden="true">&#9834;</div>
-          {{end}}
+        <div class="side">
+          <div class="art">
+            {{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener noreferrer">{{end}}
+            {{if .HasArtwork}}
+            <img src="/tracks/{{.VideoID}}/artwork" alt="" loading="lazy">
+            {{else}}
+            <div class="art-placeholder" aria-hidden="true">&#9834;</div>
+            {{end}}
+            {{if .URL}}</a>{{end}}
+          </div>
+          <div class="actions">
+            {{if not (or (eq .State "queued") (eq .State "downloading") (eq .State "converting"))}}
+            <button form="edit-{{.VideoID}}" type="submit" class="primary">Save</button>
+            {{end}}
+            {{if or (eq .State "queued") (eq .State "downloading")}}
+            <form method="post" action="/tracks/{{.VideoID}}/cancel"><button type="submit">Cancel</button></form>
+            {{end}}
+            {{if or (eq .State "failed") (eq .State "cancelled")}}
+            <form method="post" action="/tracks/{{.VideoID}}/restart"><button type="submit">Restart</button></form>
+            {{end}}
+            {{if not (or (eq .State "queued") (eq .State "downloading") (eq .State "converting"))}}
+            <form method="post" action="/tracks/{{.VideoID}}/delete" onsubmit="return confirm('Delete this track?');"><button type="submit" class="danger">Delete</button></form>
+            {{end}}
+            {{if and (eq .State "done") (ne .StoredCodec "aac")}}
+            <form method="post" action="/tracks/{{.VideoID}}/convert">
+              <button type="submit" name="equivalent" value="true">AAC equivalent</button>
+            </form>
+            {{end}}
+          </div>
         </div>
         <div class="meta">
           <form id="edit-{{.VideoID}}" method="post" action="/tracks/{{.VideoID}}"></form>
@@ -94,6 +98,13 @@
       var input = field.querySelector('input');
       var list = field.querySelector('.genre-list');
       var items = list.querySelectorAll('li');
+      var saved = input.value;
+      function commit() {
+        if (input.value === saved || !input.form) return;
+        saved = input.value;
+        if (input.form.requestSubmit) input.form.requestSubmit();
+        else input.form.submit();
+      }
       function show(filter) {
         var q = filter ? input.value.trim().toLowerCase() : '';
         var any = false;
@@ -113,8 +124,24 @@
         event.preventDefault();
         input.value = li.textContent;
         list.hidden = true;
+        commit();
       });
+      input.addEventListener('change', commit);
     });
+    var refresh = document.querySelector('meta[http-equiv="refresh"]');
+    if (refresh) {
+      document.addEventListener('focusin', function (event) {
+        if (event.target.closest('input, select, textarea')) refresh.remove();
+      });
+      document.addEventListener('focusout', function () {
+        setTimeout(function () {
+          var active = document.activeElement;
+          if (!active || !active.closest('input, select, textarea')) {
+            if (!refresh.parentNode) document.head.appendChild(refresh);
+          }
+        }, 200);
+      });
+    }
   </script>
 </body>
 </html>
