@@ -149,8 +149,8 @@ button:active { transform: translateY(1px); }
 .filename { overflow-wrap: anywhere; }
 .error { color: var(--danger); font-size: 0.85rem; margin: 0; }
 
-.side { display: flex; flex-direction: row; gap: 0.4rem; align-items: flex-start; flex: 0 0 auto; }
-.actions { display: flex; flex-direction: column; gap: 0.35rem; align-items: stretch; }
+.side { display: flex; flex-direction: row; justify-content: space-between; align-items: flex-start; gap: 0.4rem; width: 100%; }
+.actions { display: flex; flex-direction: column; gap: 0.35rem; align-items: stretch; min-width: 8rem; }
 .actions form { margin: 0; }
 .actions button { width: 100%; white-space: nowrap; }
 

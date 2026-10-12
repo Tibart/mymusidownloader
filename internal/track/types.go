@@ -2,6 +2,7 @@ package track
 
 import (
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -66,6 +67,17 @@ func AlbumName(title, album string) string {
 		return album
 	}
 	return strings.TrimSpace(title)
+}
+
+// artistTitlePattern needs spaces around the dash, so "Jay-Z" is not split.
+var artistTitlePattern = regexp.MustCompile(`^(.+?)\s+[-\x{2013}\x{2014}]\s+\S`)
+
+func ArtistFromTitle(title string) string {
+	m := artistTitlePattern.FindStringSubmatch(strings.TrimSpace(title))
+	if m == nil {
+		return ""
+	}
+	return strings.TrimSpace(m[1])
 }
 
 func AlbumArtist(artist string, various bool) string {

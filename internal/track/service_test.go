@@ -15,6 +15,7 @@ import (
 
 type fakeDownloadBehavior struct {
 	title   string
+	artist  string
 	codec   string
 	ext     string
 	bitrate int
@@ -58,6 +59,7 @@ func (f *fakeDownloader) Download(ctx context.Context, url, library, videoID str
 	media := DownloadedMedia{
 		Path:        path,
 		Title:       behavior.title,
+		Artist:      behavior.artist,
 		Codec:       behavior.codec,
 		Ext:         ext,
 		BitrateKbps: behavior.bitrate,

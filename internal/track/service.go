@@ -31,6 +31,7 @@ type DownloadedMedia struct {
 	OriginalURL   string
 	NormalizedURL string
 	Channel       string
+	Artist        string
 	UploadDate    string
 	DurationSec   int
 	SampleRate    int
@@ -301,7 +302,7 @@ func (s *Service) Recent() ([]Track, bool) {
 	tracks := RecentTracks(s.tracks, since)
 	refresh := false
 	for _, tr := range tracks {
-			if tr.State == StateQueued || tr.State == StateDownloading || tr.State == StateConverting {
+		if tr.State == StateQueued || tr.State == StateDownloading || tr.State == StateConverting {
 			refresh = true
 			break
 		}
@@ -420,6 +421,9 @@ func (s *Service) captureMetadata(videoID string, mediaFile DownloadedMedia) (st
 	if mediaFile.Channel != "" {
 		tr.Channel = mediaFile.Channel
 	}
+	if strings.TrimSpace(tr.Artist) == "" {
+		tr.Artist = guessArtist(mediaFile.Artist, tr.Title)
+	}
 	if mediaFile.UploadDate != "" {
 		tr.UploadDate = mediaFile.UploadDate
 	}
@@ -454,6 +458,14 @@ func (s *Service) captureMetadata(videoID string, mediaFile DownloadedMedia) (st
 
 func (s *Service) Genres() []string {
 	return s.store.Genres()
+}
+
+// guessArtist prefers yt-dlp artist metadata, then the text before " - " in the title.
+func guessArtist(metaArtist, title string) string {
+	if artist := strings.TrimSpace(metaArtist); artist != "" {
+		return artist
+	}
+	return ArtistFromTitle(title)
 }
 
 func coverLabel(tr *Track) string {

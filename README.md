@@ -105,6 +105,8 @@ The sample values are for a local run. For the service, set `libraryPath` to `/s
 
 The file is stored as `{Artist}/{Album}/{YYYY-MM-DD}_{PascalTitle}.{ext}`. The artist folder is `Various Artists` when that box is checked. The date is the day the download started. A taken name gets the video id appended. The YouTube URL is stored in the JSON record and in the file tags. The cover links to that URL.
 
+The artist comes from YouTube metadata when present. Otherwise it is the text before a spaced dash in the title (`Artist - Song`). With no such dash it stays empty. Edits you save are kept.
+
 An empty album name becomes the title. Check Various Artists to write the album artist as `Various Artists`. Players group tracks only when both the album name and the album artist match.
 
 The cover is a square crop of the YouTube thumbnail, at most 1024 by 1024. The artist name is drawn on a dark bar. Opus stays `.opus`. Most iOS players cannot play that. Convert it to AAC when an iPhone app must play it. Opus 96 becomes AAC 128, Opus 128 becomes AAC 160, and Opus 160 becomes AAC 192.

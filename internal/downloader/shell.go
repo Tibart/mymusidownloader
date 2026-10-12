@@ -28,6 +28,7 @@ type ytDLPInfo struct {
 	ABR        float64 `json:"abr"`
 	TBR        float64 `json:"tbr"`
 	Uploader   string  `json:"uploader"`
+	Artist     string  `json:"artist"`
 	Channel    string  `json:"channel"`
 	UploadDate string  `json:"upload_date"`
 	Duration   float64 `json:"duration"`
@@ -74,6 +75,7 @@ func (d ShellDownloader) Download(ctx context.Context, url, library, videoID str
 		OriginalURL:   url,
 		NormalizedURL: sourceURL,
 		Channel:       channel,
+		Artist:        info.Artist,
 		UploadDate:    info.UploadDate,
 		DurationSec:   int(info.Duration),
 		ArtworkPath:   findThumbnail(library, videoID),
