@@ -27,6 +27,7 @@ type Config struct {
 	Bind          string `json:"bind"`
 	YTDLPPath     string `json:"ytDlpPath"`
 	FFmpegPath    string `json:"ffmpegPath"`
+	SetlistFMKey  string `json:"setlistFmApiKey"`
 }
 
 func Load(path string) (Config, error) {

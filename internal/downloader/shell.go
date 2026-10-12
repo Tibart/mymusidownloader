@@ -21,18 +21,21 @@ type ShellDownloader struct {
 }
 
 type ytDLPInfo struct {
-	ID         string  `json:"id"`
-	Title      string  `json:"title"`
-	ACodec     string  `json:"acodec"`
-	Ext        string  `json:"ext"`
-	ABR        float64 `json:"abr"`
-	TBR        float64 `json:"tbr"`
-	Uploader   string  `json:"uploader"`
-	Artist     string  `json:"artist"`
-	Channel    string  `json:"channel"`
-	UploadDate string  `json:"upload_date"`
-	Duration   float64 `json:"duration"`
-	WebpageURL string  `json:"webpage_url"`
+	ID          string  `json:"id"`
+	Title       string  `json:"title"`
+	ACodec      string  `json:"acodec"`
+	Ext         string  `json:"ext"`
+	ABR         float64 `json:"abr"`
+	TBR         float64 `json:"tbr"`
+	Uploader    string  `json:"uploader"`
+	Artist      string  `json:"artist"`
+	Album       string  `json:"album"`
+	ReleaseDate string  `json:"release_date"`
+	ReleaseYear int     `json:"release_year"`
+	Channel     string  `json:"channel"`
+	UploadDate  string  `json:"upload_date"`
+	Duration    float64 `json:"duration"`
+	WebpageURL  string  `json:"webpage_url"`
 }
 
 func (d ShellDownloader) Download(ctx context.Context, url, library, videoID string) (track.DownloadedMedia, error) {
@@ -76,7 +79,8 @@ func (d ShellDownloader) Download(ctx context.Context, url, library, videoID str
 		NormalizedURL: sourceURL,
 		Channel:       channel,
 		Artist:        info.Artist,
-		UploadDate:    info.UploadDate,
+		Album:         info.Album,
+		UploadDate:    releaseDate(info),
 		DurationSec:   int(info.Duration),
 		ArtworkPath:   findThumbnail(library, videoID),
 	}, nil
@@ -257,6 +261,9 @@ func audioComment(tags track.Tags) string {
 	if tags.Channels > 0 {
 		parts = append(parts, "channels="+strconv.Itoa(tags.Channels))
 	}
+	if tags.Event != "" {
+		parts = append(parts, "event="+tags.Event)
+	}
 	if tags.SourceURL != "" {
 		parts = append(parts, "source="+tags.SourceURL)
 	}
@@ -322,6 +329,17 @@ func (t FFmpegMediaTool) probe(ctx context.Context, path string) audioProbe {
 		probed.DurationSec = int(duration)
 	}
 	return probed
+}
+
+// releaseDate prefers the release date, then the release year, then the upload date.
+func releaseDate(info ytDLPInfo) string {
+	if info.ReleaseDate != "" {
+		return info.ReleaseDate
+	}
+	if info.ReleaseYear > 0 {
+		return strconv.Itoa(info.ReleaseYear)
+	}
+	return info.UploadDate
 }
 
 func bitrateKbps(info ytDLPInfo) int {

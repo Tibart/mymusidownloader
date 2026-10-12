@@ -14,13 +14,15 @@ import (
 )
 
 type fakeDownloadBehavior struct {
-	title   string
-	artist  string
-	codec   string
-	ext     string
-	bitrate int
-	block   chan struct{}
-	err     error
+	title      string
+	artist     string
+	album      string
+	uploadDate string
+	codec      string
+	ext        string
+	bitrate    int
+	block      chan struct{}
+	err        error
 }
 
 type fakeDownloader struct {
@@ -60,6 +62,8 @@ func (f *fakeDownloader) Download(ctx context.Context, url, library, videoID str
 		Path:        path,
 		Title:       behavior.title,
 		Artist:      behavior.artist,
+		Album:       behavior.album,
+		UploadDate:  behavior.uploadDate,
 		Codec:       behavior.codec,
 		Ext:         ext,
 		BitrateKbps: behavior.bitrate,
@@ -711,4 +715,56 @@ func waitFor(t *testing.T, fn func() bool) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("condition not met before timeout")
+}
+
+func TestServiceFillsAlbumOnlyWhenEmpty(t *testing.T) {
+	library := t.TempDir()
+	store := NewFileStore(library)
+	downloader := &fakeDownloader{behaviors: map[string]fakeDownloadBehavior{
+		"dQw4w9WgXcQ": {title: "Song", album: "Meta Album", codec: "mp3", ext: "mp3", bitrate: 128},
+	}}
+	service, err := NewService(library, 1, store, downloader, &fakeMediaTool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ"); err != nil {
+		t.Fatal(err)
+	}
+	waitForState(t, service, "dQw4w9WgXcQ", StateDone)
+	tr, _ := service.Get("dQw4w9WgXcQ")
+	if tr.Album != "Meta Album" {
+		t.Fatalf("album = %q, want Meta Album", tr.Album)
+	}
+}
+
+func TestServiceAppliesEventLookupToTrackAndTags(t *testing.T) {
+	library := t.TempDir()
+	store := NewFileStore(library)
+	mediaTool := &fakeMediaTool{}
+	downloader := &fakeDownloader{behaviors: map[string]fakeDownloadBehavior{
+		"dQw4w9WgXcQ": {title: "Band - Live at Hall 2019", artist: "Band", uploadDate: "20190609", codec: "mp3", ext: "mp3", bitrate: 128},
+	}}
+	service, err := NewService(library, 1, store, downloader, mediaTool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.SetEventLookup(func(_ context.Context, artist, year, title string) (string, error) {
+		if artist != "Band" || year != "2019" {
+			t.Fatalf("lookup got artist %q year %q", artist, year)
+		}
+		return "Hall, City, NL, 2019-06-09; https://x", nil
+	})
+	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ"); err != nil {
+		t.Fatal(err)
+	}
+	waitForState(t, service, "dQw4w9WgXcQ", StateDone)
+	tr, _ := service.Get("dQw4w9WgXcQ")
+	if tr.Event != "Hall, City, NL, 2019-06-09; https://x" {
+		t.Fatalf("event = %q", tr.Event)
+	}
+	mediaTool.mu.Lock()
+	defer mediaTool.mu.Unlock()
+	if len(mediaTool.writeCalls) == 0 || mediaTool.writeCalls[len(mediaTool.writeCalls)-1].tags.Event != tr.Event {
+		t.Fatalf("tags written without event: %+v", mediaTool.writeCalls)
+	}
 }

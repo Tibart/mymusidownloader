@@ -13,6 +13,7 @@ import (
 
 	"mymusidownloader/internal/config"
 	"mymusidownloader/internal/downloader"
+	"mymusidownloader/internal/setlist"
 	"mymusidownloader/internal/track"
 	"mymusidownloader/internal/version"
 	"mymusidownloader/internal/web"
@@ -49,6 +50,9 @@ func main() {
 	)
 	if err != nil {
 		log.Fatalf("start service: %v", err)
+	}
+	if cfg.SetlistFMKey != "" {
+		svc.SetEventLookup(setlist.Lookup(setlist.NewClient(cfg.SetlistFMKey)))
 	}
 
 	server, err := web.New(svc)

@@ -89,6 +89,7 @@ If status is `203/EXEC`, the binary is not executable or is the wrong CPU. `file
 | `bind` | `127.0.0.1` | Listen address. Remove it to listen on the private-network address. |
 | `ytDlpPath` | `/usr/local/bin/yt-dlp` | `yt-dlp` binary. |
 | `ffmpegPath` | `/usr/bin/ffmpeg` | `ffmpeg` binary. |
+| `setlistFmApiKey` | `""` | Optional setlist.fm API key. Empty turns event lookup off. Keep it out of git. |
 
 The sample values are for a local run. For the service, set `libraryPath` to `/srv/music` and `metadataPath` to `/var/lib/mymusidownloader`.
 
@@ -104,6 +105,10 @@ The sample values are for a local run. For the service, set `libraryPath` to `/s
 ## What a download stores
 
 The file is stored as `{Artist}/{Album}/{YYYY-MM-DD}_{PascalTitle}.{ext}`. The artist folder is `Various Artists` when that box is checked. The date is the day the download started. A taken name gets the video id appended. The YouTube URL is stored in the JSON record and in the file tags. The cover links to that URL.
+
+The album comes from YouTube metadata when present and the track has none. The `date` tag is the release date when YouTube has one, else the release year, else the upload date.
+
+Live tracks: a title with `Live at X` or `@ X` (venue) is looked up on setlist.fm by artist and release year. A match must have the same artist name and a venue containing X. The venue, city, country, date and setlist URL go into the `comment` tag and the `event` field in the JSON record. No match means nothing is added.
 
 The artist comes from YouTube metadata when present. Otherwise it is the text before a spaced dash in the title (`Artist - Song`). With no such dash it stays empty. Edits you save are kept.
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -32,6 +33,7 @@ type DownloadedMedia struct {
 	NormalizedURL string
 	Channel       string
 	Artist        string
+	Album         string
 	UploadDate    string
 	DurationSec   int
 	SampleRate    int
@@ -52,6 +54,9 @@ type MediaTool interface {
 	LabelArtwork(ctx context.Context, inputPath, album, outputPath string) error
 }
 
+// EventLookup returns a short live-event description for artist, release year and title, or "" when none matches.
+type EventLookup func(ctx context.Context, artist, year, title string) (string, error)
+
 type Service struct {
 	mu            sync.Mutex
 	library       string
@@ -60,6 +65,7 @@ type Service struct {
 	downloader    Downloader
 	mediaTool     MediaTool
 	now           func() time.Time
+	eventLookup   EventLookup
 
 	tracks  map[string]*Track
 	queue   []string
@@ -383,6 +389,7 @@ func (s *Service) runTrack(ctx context.Context, videoID, url string) {
 		return
 	}
 
+	s.applyEvent(ctx, videoID, &tags)
 	finalName, storedCodec, storeErr := s.storeMedia(ctx, videoID, mediaFile, titleForName, startedAt, tags)
 	if storeErr != nil {
 		cleanup := mediaFile.Path
@@ -424,6 +431,9 @@ func (s *Service) captureMetadata(videoID string, mediaFile DownloadedMedia) (st
 	if strings.TrimSpace(tr.Artist) == "" {
 		tr.Artist = guessArtist(mediaFile.Artist, tr.Title)
 	}
+	if strings.TrimSpace(tr.Album) == "" {
+		tr.Album = strings.TrimSpace(mediaFile.Album)
+	}
 	if mediaFile.UploadDate != "" {
 		tr.UploadDate = mediaFile.UploadDate
 	}
@@ -454,6 +464,53 @@ func (s *Service) captureMetadata(videoID string, mediaFile DownloadedMedia) (st
 		}
 	}
 	return tr.Title, tags, tr.DownloadStartedAt, nil
+}
+
+func (s *Service) SetEventLookup(lookup EventLookup) {
+	s.eventLookup = lookup
+}
+
+func (s *Service) applyEvent(ctx context.Context, videoID string, tags *Tags) {
+	if s.eventLookup == nil {
+		return
+	}
+	s.mu.Lock()
+	tr, ok := s.tracks[videoID]
+	if !ok {
+		s.mu.Unlock()
+		return
+	}
+	artist, title, year := strings.TrimSpace(tr.Artist), tr.Title, yearOf(tr.UploadDate)
+	s.mu.Unlock()
+	if artist == "" || year == "" {
+		return
+	}
+	event, err := s.eventLookup(ctx, artist, year, title)
+	if err != nil {
+		log.Printf("event lookup %s: %v", videoID, err)
+		return
+	}
+	if event == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tr, ok = s.tracks[videoID]
+	if !ok {
+		return
+	}
+	tr.Event = event
+	if err := s.store.Save(*tr); err != nil {
+		log.Printf("save event %s: %v", videoID, err)
+	}
+	tags.Event = event
+}
+
+func yearOf(date string) string {
+	if len(date) < 4 {
+		return ""
+	}
+	return date[:4]
 }
 
 func (s *Service) Genres() []string {

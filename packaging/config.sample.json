@@ -5,5 +5,6 @@
   "maxConcurrent": 2,
   "bind": "127.0.0.1",
   "ytDlpPath": "/usr/local/bin/yt-dlp",
-  "ffmpegPath": "/usr/bin/ffmpeg"
+  "ffmpegPath": "/usr/bin/ffmpeg",
+  "setlistFmApiKey": ""
 }

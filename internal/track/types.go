@@ -36,6 +36,7 @@ type Track struct {
 	Channels          int       `json:"channels,omitempty"`
 	State             State     `json:"state"`
 	FileName          string    `json:"fileName,omitempty"`
+	Event             string    `json:"event,omitempty"`
 	Error             string    `json:"error,omitempty"`
 	TouchedAt         time.Time `json:"touchedAt"`
 	CreatedAt         time.Time `json:"createdAt,omitempty"`
@@ -115,6 +116,7 @@ type Tags struct {
 	SampleRate  int
 	Channels    int
 	ArtworkPath string
+	Event       string
 }
 
 func (t Track) Tags() Tags {
@@ -127,6 +129,7 @@ func (t Track) Tags() Tags {
 		Channel:     t.Channel,
 		UploadDate:  t.UploadDate,
 		SourceURL:   t.URL,
+		Event:       t.Event,
 		Codec:       t.StoredCodec,
 		BitrateKbps: t.SourceBitrateKbps,
 		DurationSec: t.DurationSec,
