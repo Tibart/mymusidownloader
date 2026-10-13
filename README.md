@@ -124,12 +124,12 @@ Examples use `http://127.0.0.1:6874`. Replace the host when the daemon is elsewh
 
 `GET /tracks/abc123def45/artwork` is the cover JPEG. Missing art is 404.
 
-`POST /trigger` accepts a watch URL or an 11-character video id. It returns when the download is accepted, not when the file is finished. `rejected` means the URL was not a single video. `stored` means that video is already on disk. `queued` means it is waiting for a slot. `downloading` means it has started.
+`POST /trigger` accepts a watch URL or an 11-character video id, and optional `start` and `end` cut times (`90`, `1:30` or `1:02:03`). The cut keeps `start` to `end` in seconds; leave `end` out to keep the rest. The cut applies to a new download only, not to a track that is already stored. It returns when the download is accepted, not when the file is finished. `rejected` means the URL was not a single video. `stored` means that video is already on disk. `queued` means it is waiting for a slot. `downloading` means it has started.
 
 ```sh
 curl -sS -X POST http://127.0.0.1:6874/trigger \
   -H 'Content-Type: application/json' \
-  -d '{"url":"https://www.youtube.com/watch?v=abc123def45"}'
+  -d '{"url":"https://www.youtube.com/watch?v=abc123def45","start":"1:30","end":"2:00"}'
 ```
 
 `POST /tracks/abc123def45` saves title, artist, album, genre, and the Various Artists flag. A non-empty new genre is added to the lookup. This is rejected while the track is queued, downloading, or converting.

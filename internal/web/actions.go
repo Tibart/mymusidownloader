@@ -10,9 +10,9 @@ import (
 
 func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request, videoID string) {
 	payload := struct {
-		Title  string `json:"title"`
-		Artist string `json:"artist"`
-		Genre  string `json:"genre"`
+		Title          string `json:"title"`
+		Artist         string `json:"artist"`
+		Genre          string `json:"genre"`
 		Album          string `json:"album"`
 		VariousArtists bool   `json:"variousArtists"`
 	}{}

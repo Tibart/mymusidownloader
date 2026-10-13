@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
 	"os"
 	"strings"
 	"testing"
@@ -16,6 +17,7 @@ import (
 
 type stubApp struct {
 	triggerInput string
+	triggerCut   track.Cut
 	editVideoID  string
 	editTitle    string
 	editArtist   string
@@ -32,8 +34,9 @@ type stubApp struct {
 	artworkOK   bool
 }
 
-func (s *stubApp) Trigger(ctx context.Context, input string) (track.StartResult, error) {
+func (s *stubApp) Trigger(ctx context.Context, input string, cut track.Cut) (track.StartResult, error) {
 	s.triggerInput = input
+	s.triggerCut = cut
 	return s.triggerResult, nil
 }
 
@@ -352,5 +355,46 @@ func TestRecentPageArtworkRendering(t *testing.T) {
 	}
 	if !strings.Contains(body, "art-placeholder") {
 		t.Fatalf("expected placeholder element: %s", body)
+	}
+}
+
+func TestTriggerPassesCutFromJSONAndForm(t *testing.T) {
+	app := &stubApp{}
+	server, err := New(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Handler()
+	req := httptest.NewRequest(http.MethodPost, "/trigger", strings.NewReader(`{"url":"https://www.youtube.com/watch?v=abc123def45","start":"1:30","end":"2:00"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || app.triggerCut != (track.Cut{Start: 90, End: 120}) {
+		t.Fatalf("json: status %d cut %+v", rec.Code, app.triggerCut)
+	}
+
+	form := neturl.Values{"url": {"https://www.youtube.com/watch?v=abc123def45"}, "start": {"30"}}
+	req = httptest.NewRequest(http.MethodPost, "/trigger", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if app.triggerCut != (track.Cut{Start: 30}) {
+		t.Fatalf("form cut = %+v", app.triggerCut)
+	}
+}
+
+func TestTriggerRejectsBadCutTime(t *testing.T) {
+	app := &stubApp{}
+	server, err := New(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Handler()
+	req := httptest.NewRequest(http.MethodPost, "/trigger", strings.NewReader(`{"url":"https://www.youtube.com/watch?v=abc123def45","start":"0:30","end":"0:10"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
 	}
 }

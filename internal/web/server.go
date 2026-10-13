@@ -13,7 +13,7 @@ import (
 )
 
 type App interface {
-	Trigger(ctx context.Context, input string) (track.StartResult, error)
+	Trigger(ctx context.Context, input string, cut track.Cut) (track.StartResult, error)
 	Update(videoID, title, artist, genre, album string, variousArtists bool) (track.Track, error)
 	Cancel(videoID string) (track.Track, error)
 	Restart(ctx context.Context, videoID string) (track.StartResult, error)
@@ -77,12 +77,12 @@ func (s *Server) handleTrigger(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	input, err := readURLInput(r)
+	input, cut, err := readTriggerInput(r)
 	if err != nil {
 		writeError(w, r, http.StatusBadRequest, err)
 		return
 	}
-	result, err := s.app.Trigger(r.Context(), input)
+	result, err := s.app.Trigger(r.Context(), input, cut)
 	if err != nil {
 		writeError(w, r, http.StatusInternalServerError, err)
 		return

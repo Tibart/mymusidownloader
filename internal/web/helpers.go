@@ -11,29 +11,6 @@ import (
 	"mymusidownloader/internal/track"
 )
 
-func readURLInput(r *http.Request) (string, error) {
-	if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
-		var body struct {
-			URL string `json:"url"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			return "", fmt.Errorf("decode body: %w", err)
-		}
-		if strings.TrimSpace(body.URL) == "" {
-			return "", errors.New("url is required")
-		}
-		return body.URL, nil
-	}
-	if err := r.ParseForm(); err != nil {
-		return "", err
-	}
-	input := strings.TrimSpace(r.FormValue("url"))
-	if input == "" {
-		return "", errors.New("url is required")
-	}
-	return input, nil
-}
-
 func wantsJSON(r *http.Request) bool {
 	contentType := r.Header.Get("Content-Type")
 	accept := r.Header.Get("Accept")
@@ -95,4 +72,33 @@ func noticeFromQuery(r *http.Request) string {
 		notice += ": " + errText
 	}
 	return notice
+}
+
+type triggerInput struct {
+	URL   string `json:"url"`
+	Start string `json:"start"`
+	End   string `json:"end"`
+}
+
+// readTriggerInput reads the URL and optional cut times from JSON or a form.
+func readTriggerInput(r *http.Request) (string, track.Cut, error) {
+	var in triggerInput
+	if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			return "", track.Cut{}, fmt.Errorf("decode body: %w", err)
+		}
+	} else {
+		if err := r.ParseForm(); err != nil {
+			return "", track.Cut{}, err
+		}
+		in = triggerInput{URL: r.FormValue("url"), Start: r.FormValue("start"), End: r.FormValue("end")}
+	}
+	if strings.TrimSpace(in.URL) == "" {
+		return "", track.Cut{}, errors.New("url is required")
+	}
+	cut, err := track.ParseCut(in.Start, in.End)
+	if err != nil {
+		return "", track.Cut{}, err
+	}
+	return strings.TrimSpace(in.URL), cut, nil
 }

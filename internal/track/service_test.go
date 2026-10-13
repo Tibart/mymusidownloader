@@ -102,6 +102,7 @@ type fakeMediaTool struct {
 	mu           sync.Mutex
 	convertCalls []convertCall
 	writeCalls   []writeCall
+	cutCalls     []Cut
 	holdWrite    chan struct{}
 }
 
@@ -156,6 +157,13 @@ func (f *fakeMediaTool) ConvertCount() int {
 	return len(f.convertCalls)
 }
 
+func (f *fakeMediaTool) Cut(_ context.Context, inputPath, outputPath string, cut Cut) error {
+	f.mu.Lock()
+	f.cutCalls = append(f.cutCalls, cut)
+	f.mu.Unlock()
+	return os.WriteFile(outputPath, []byte("cut"), 0o644)
+}
+
 func (f *fakeMediaTool) WriteCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -193,7 +201,7 @@ func TestServiceStoredRestartAndDuplicateInFlight(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		result, err := service.Trigger(context.Background(), "dQw4w9WgXcQ")
+		result, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -229,7 +237,7 @@ func TestServiceStoredRestartAndDuplicateInFlight(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				result, err := service.Trigger(context.Background(), youtube.WatchURL("dQw4w9WgXcQ"))
+				result, err := service.Trigger(context.Background(), youtube.WatchURL("dQw4w9WgXcQ"), Cut{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -259,11 +267,11 @@ func TestServiceStoredRestartAndDuplicateInFlight(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		first, err := service.Trigger(context.Background(), "dQw4w9WgXcQ")
+		first, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		second, err := service.Trigger(context.Background(), "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+		second, err := service.Trigger(context.Background(), "https://www.youtube.com/watch?v=dQw4w9WgXcQ", Cut{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -292,11 +300,11 @@ func TestServiceQueueLimitAndSlotRelease(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	first, err := service.Trigger(context.Background(), "dQw4w9WgXcQ")
+	first, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := service.Trigger(context.Background(), "9bZkp7q19f0")
+	second, err := service.Trigger(context.Background(), "9bZkp7q19f0", Cut{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +351,7 @@ func TestServiceCodecHandlingAndTagEdits(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			result, err := service.Trigger(context.Background(), "dQw4w9WgXcQ")
+			result, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -396,7 +404,7 @@ func TestServiceCancelRemovesPartialAndSetsCancelled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ"); err != nil {
+	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{}); err != nil {
 		t.Fatal(err)
 	}
 	partialPath := filepath.Join(library, "dQw4w9WgXcQ.mp3")
@@ -494,10 +502,10 @@ func TestServiceRestartOnlyFromFailedOrCancelled(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ"); err != nil {
+				if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{}); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := service.Trigger(context.Background(), "9bZkp7q19f0"); err != nil {
+				if _, err := service.Trigger(context.Background(), "9bZkp7q19f0", Cut{}); err != nil {
 					t.Fatal(err)
 				}
 				waitForTrackStateRead(t, service, "9bZkp7q19f0", StateQueued)
@@ -549,7 +557,7 @@ func TestServiceUnknownBitrateDoesNotUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ"); err != nil {
+	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{}); err != nil {
 		t.Fatal(err)
 	}
 	waitForState(t, service, "dQw4w9WgXcQ", StateFailed)
@@ -576,7 +584,7 @@ func TestServiceCancelDuringTagWriteStaysCancelled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ"); err != nil {
+	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{}); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool { return mediaTool.WriteCount() == 1 })
@@ -727,7 +735,7 @@ func TestServiceFillsAlbumOnlyWhenEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ"); err != nil {
+	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{}); err != nil {
 		t.Fatal(err)
 	}
 	waitForState(t, service, "dQw4w9WgXcQ", StateDone)
@@ -754,7 +762,7 @@ func TestServiceAppliesEventLookupToTrackAndTags(t *testing.T) {
 		}
 		return "Hall, City, NL, 2019-06-09; https://x", nil
 	})
-	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ"); err != nil {
+	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{}); err != nil {
 		t.Fatal(err)
 	}
 	waitForState(t, service, "dQw4w9WgXcQ", StateDone)

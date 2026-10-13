@@ -52,6 +52,7 @@ type MediaTool interface {
 	Remux(ctx context.Context, inputPath, outputPath string) error
 	PrepareArtwork(ctx context.Context, inputPath, outputPath string) error
 	LabelArtwork(ctx context.Context, inputPath, album, outputPath string) error
+	Cut(ctx context.Context, inputPath, outputPath string, cut Cut) error
 }
 
 // EventLookup returns a short live-event description for artist, release year and title, or "" when none matches.
@@ -118,7 +119,7 @@ func (s *Service) SetNow(now func() time.Time) {
 	s.now = now
 }
 
-func (s *Service) Trigger(_ context.Context, input string) (StartResult, error) {
+func (s *Service) Trigger(_ context.Context, input string, cut Cut) (StartResult, error) {
 	target, err := youtube.Parse(input)
 	if err != nil {
 		return StartResult{State: StateRejected, Error: err.Error()}, nil
@@ -142,6 +143,7 @@ func (s *Service) Trigger(_ context.Context, input string) (StartResult, error) 
 		case StateDownloading:
 			return StartResult{VideoID: existing.VideoID, State: StateDownloading}, nil
 		default:
+			existing.Cut = cut
 			return s.startLocked(existing, target.URL)
 		}
 	}
@@ -149,6 +151,7 @@ func (s *Service) Trigger(_ context.Context, input string) (StartResult, error) 
 	tr := &Track{
 		VideoID:   target.VideoID,
 		URL:       target.URL,
+		Cut:       cut,
 		CreatedAt: s.now(),
 		TouchedAt: s.now(),
 	}
@@ -383,6 +386,13 @@ func (s *Service) runTrack(ctx context.Context, videoID, url string) {
 		return
 	}
 
+	if cut := s.cutFor(videoID); cut.Active() {
+		if err := s.applyCut(ctx, &mediaFile, cut); err != nil {
+			s.failRun(videoID, mediaFile.Path, ctx.Err(), err)
+			return
+		}
+	}
+
 	titleForName, tags, startedAt, err := s.captureMetadata(videoID, mediaFile)
 	if err != nil {
 		s.failRun(videoID, mediaFile.Path, ctx.Err(), err)
@@ -504,6 +514,31 @@ func (s *Service) applyEvent(ctx context.Context, videoID string, tags *Tags) {
 		log.Printf("save event %s: %v", videoID, err)
 	}
 	tags.Event = event
+}
+
+func (s *Service) cutFor(videoID string) Cut {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if tr, ok := s.tracks[videoID]; ok {
+		return tr.Cut
+	}
+	return Cut{}
+}
+
+// applyCut replaces the downloaded file with the cut section and sets its length.
+func (s *Service) applyCut(ctx context.Context, media *DownloadedMedia, cut Cut) error {
+	ext := filepath.Ext(media.Path)
+	tmp := strings.TrimSuffix(media.Path, ext) + ".cut" + ext
+	if err := s.mediaTool.Cut(ctx, media.Path, tmp, cut); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("cut audio: %w", err)
+	}
+	if err := os.Rename(tmp, media.Path); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("replace cut audio: %w", err)
+	}
+	media.DurationSec = cut.Length(media.DurationSec)
+	return nil
 }
 
 func yearOf(date string) string {

@@ -1,8 +1,11 @@
 package track
 
 import (
+	"errors"
+	"fmt"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -37,6 +40,7 @@ type Track struct {
 	State             State     `json:"state"`
 	FileName          string    `json:"fileName,omitempty"`
 	Event             string    `json:"event,omitempty"`
+	Cut               Cut       `json:"cut"`
 	Error             string    `json:"error,omitempty"`
 	TouchedAt         time.Time `json:"touchedAt"`
 	CreatedAt         time.Time `json:"createdAt,omitempty"`
@@ -136,4 +140,68 @@ func (t Track) Tags() Tags {
 		SampleRate:  t.SampleRate,
 		Channels:    t.Channels,
 	}
+}
+
+// Cut limits a download to [Start, End) in seconds. End 0 means to the end.
+type Cut struct {
+	Start int `json:"start,omitempty"`
+	End   int `json:"end,omitempty"`
+}
+
+func (c Cut) Active() bool {
+	return c.Start > 0 || c.End > 0
+}
+
+// Length returns the cut duration in seconds for a source of full seconds.
+func (c Cut) Length(full int) int {
+	if c.End > 0 {
+		end := c.End
+		if full > 0 && end > full {
+			end = full
+		}
+		if end > c.Start {
+			return end - c.Start
+		}
+		return 0
+	}
+	if full > c.Start {
+		return full - c.Start
+	}
+	return 0
+}
+
+// ParseCut reads optional start and end values such as "90", "1:30" or "1:02:03".
+func ParseCut(start, end string) (Cut, error) {
+	s, err := parseCutTime(start)
+	if err != nil {
+		return Cut{}, fmt.Errorf("start: %w", err)
+	}
+	e, err := parseCutTime(end)
+	if err != nil {
+		return Cut{}, fmt.Errorf("end: %w", err)
+	}
+	if e > 0 && e <= s {
+		return Cut{}, errors.New("end must be after start")
+	}
+	return Cut{Start: s, End: e}, nil
+}
+
+func parseCutTime(value string) (int, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, nil
+	}
+	parts := strings.Split(value, ":")
+	if len(parts) > 3 {
+		return 0, fmt.Errorf("%q is not a time", value)
+	}
+	total := 0
+	for _, part := range parts {
+		n, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || n < 0 {
+			return 0, fmt.Errorf("%q is not a time", value)
+		}
+		total = total*60 + n
+	}
+	return total, nil
 }

@@ -151,6 +151,19 @@ func (t FFmpegMediaTool) Remux(ctx context.Context, inputPath, outputPath string
 	return runFFmpeg(ctx, t.FFmpegPath, "-y", "-i", inputPath, "-map", "0:a", "-c", "copy", outputPath)
 }
 
+func (t FFmpegMediaTool) Cut(ctx context.Context, inputPath, outputPath string, cut track.Cut) error {
+	return runFFmpeg(ctx, t.FFmpegPath, cutArgs(inputPath, outputPath, cut)...)
+}
+
+// cutArgs seeks after -i so the copy is exact, as the output tests showed.
+func cutArgs(inputPath, outputPath string, cut track.Cut) []string {
+	args := []string{"-y", "-i", inputPath, "-ss", strconv.Itoa(cut.Start)}
+	if cut.End > 0 {
+		args = append(args, "-to", strconv.Itoa(cut.End))
+	}
+	return append(args, "-map", "0:a", "-c", "copy", outputPath)
+}
+
 func (t FFmpegMediaTool) WriteTags(ctx context.Context, path string, tags track.Tags) error {
 	ext := filepath.Ext(path)
 	tmpPath := filepath.Join(filepath.Dir(path), "."+strings.TrimSuffix(filepath.Base(path), ext)+".tagtmp"+ext)
