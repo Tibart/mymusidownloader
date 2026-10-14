@@ -78,12 +78,13 @@ input[type="text"] {
 }
 input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-/* Secondary is the base: a tinted outline in the card's own colour family. */
+/* Secondary is the base: a tinted outline and tinted label in the card's own colour family.
+   45% tint on black keeps the label above 4.5:1 even when the cover averages to white. */
 button {
   font: inherit;
   border: 1px solid color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 40%, var(--border));
   background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 10%, var(--surface));
-  color: var(--text);
+  color: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 45%, black);
   border-radius: 10px;
   padding: 0.5rem 0.9rem;
   min-height: 44px;
@@ -91,10 +92,22 @@ button {
 }
 button:hover { background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 22%, var(--surface)); }
 @media (prefers-color-scheme: dark) {
-  button { background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 16%, var(--surface)); }
+  /* On dark cards the label is lifted towards white instead, same hue. */
+  button {
+    background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 16%, var(--surface));
+    color: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 45%, white);
+  }
   button:hover { background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 30%, var(--surface)); }
 }
-button.primary, .trigger-row button {
+/* Primary is a solid fill of the same tint, dark enough for white text at 4.5:1. */
+button.primary {
+  background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 45%, black);
+  border-color: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 60%, black);
+  color: #ffffff;
+  font-weight: 600;
+}
+button.primary:hover { background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 55%, black); }
+.trigger-row button {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-contrast);
@@ -152,20 +165,19 @@ button:active { transform: translateY(1px); }
 .track-top { display: flex; gap: 0.75rem; align-items: center; }
 .beside { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
 .album { grid-column: 1 / -1; }
-.genre-field { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
-.genre-field > input { flex: 1 1 5rem; min-width: 0; }
-.genre-lookup { margin: 0; flex: 0 0 auto; }
+.genre-field { position: relative; grid-column: 1 / -1; display: flex; flex-direction: column; gap: 0.3rem; }
+.genre-row { display: flex; align-items: stretch; gap: 0.4rem; }
+.genre-row > input { flex: 1 1 auto; min-width: 0; }
+.genre-lookup { margin: 0; flex: 0 0 auto; display: flex; }
 .genre-list {
   position: static; z-index: 5; left: auto; right: auto; top: auto;
-  margin: 0.35rem 0 0; padding: 0.25rem 0; list-style: none;
+  margin: 0; padding: 0.25rem 0; list-style: none;
   background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
   max-height: 12rem; overflow: auto;
-  flex: 1 1 100%;
 }
 .genre-list li { padding: 0.55rem 0.7rem; }
 .genre-list li:active, .genre-list li:hover { background: var(--border); }
 .field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
-.field-grid input { font-size: 0.85rem; }
 .info-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; font-size: 0.8rem; color: var(--muted); }
 .badge { text-transform: capitalize; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 0.1rem 0.55rem; }
 .filename { overflow-wrap: anywhere; }

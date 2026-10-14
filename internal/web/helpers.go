@@ -8,8 +8,12 @@ import (
 	"net/url"
 	"strings"
 
+	"mymusidownloader/internal/genre"
 	"mymusidownloader/internal/track"
 )
+
+// genreBusyMessage is shown when MusicBrainz throttles the genre lookup, so the page says what to do.
+const genreBusyMessage = "MusicBrainz is busy, try again in a minute"
 
 func wantsJSON(r *http.Request) bool {
 	contentType := r.Header.Get("Content-Type")
@@ -23,6 +27,8 @@ func writeTrackError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, r, http.StatusNotFound, err)
 	case errors.Is(err, track.ErrInvalidTransition):
 		writeError(w, r, http.StatusConflict, err)
+	case errors.Is(err, genre.ErrUnavailable):
+		writeError(w, r, http.StatusBadGateway, errors.New(genreBusyMessage))
 	default:
 		writeError(w, r, http.StatusInternalServerError, err)
 	}

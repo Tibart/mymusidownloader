@@ -586,7 +586,7 @@ func (s *Service) LookupGenre(videoID string) (Track, error) {
 	}
 	genre, err := lookup(context.Background(), artist)
 	if err != nil {
-		return Track{}, err
+		return Track{}, fmt.Errorf("genre lookup %s: %w", videoID, err)
 	}
 	if genre == "" || genre == current.Genre {
 		return current, nil

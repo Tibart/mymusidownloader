@@ -910,4 +910,13 @@ func TestLookupGenreAction(t *testing.T) {
 			t.Fatalf("LookupGenre unknown = %v, want ErrNotFound", err)
 		}
 	})
+
+	t.Run("passes the lookup error through", func(t *testing.T) {
+		service, _ := newDoneService(t)
+		upstream := errors.New("musicbrainz unavailable")
+		service.SetGenreLookup(func(_ context.Context, _ string) (string, error) { return "", upstream })
+		if _, err := service.LookupGenre("dQw4w9WgXcQ"); !errors.Is(err, upstream) {
+			t.Fatalf("LookupGenre = %v, want the upstream error", err)
+		}
+	})
 }

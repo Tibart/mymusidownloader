@@ -75,10 +75,12 @@
             <input form="edit-{{.VideoID}}" type="text" name="artist" value="{{.Artist}}" placeholder="Artist" aria-label="Artist">
             <input form="edit-{{.VideoID}}" class="album" type="text" name="album" value="{{.Album}}" placeholder="Album" aria-label="Album">
             <div class="genre-field">
-              <input form="edit-{{.VideoID}}" type="text" name="genre" value="{{.Genre}}" placeholder="Genre" aria-label="Genre" autocomplete="off">
-              {{if not (or (eq .State "queued") (eq .State "downloading") (eq .State "converting"))}}
-              <form class="genre-lookup" method="post" action="/tracks/{{.VideoID}}/genre-lookup"><button type="submit" class="small">Find genre</button></form>
-              {{end}}
+              <div class="genre-row">
+                <input form="edit-{{.VideoID}}" type="text" name="genre" value="{{.Genre}}" placeholder="Genre" aria-label="Genre" autocomplete="off">
+                {{if not (or (eq .State "queued") (eq .State "downloading") (eq .State "converting"))}}
+                <form class="genre-lookup" method="post" action="/tracks/{{.VideoID}}/genre-lookup"><button type="submit" class="small">Find genre</button></form>
+                {{end}}
+              </div>
               <ul class="genre-list" hidden>
                 {{range $.Genres}}<li>{{.}}</li>{{end}}
               </ul>

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	neturl "net/url"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"mymusidownloader/internal/genre"
 	"mymusidownloader/internal/track"
 )
 
@@ -26,6 +28,7 @@ type stubApp struct {
 	restartVideo string
 
 	genreLookupVideo string
+	genreLookupErr   error
 
 	triggerResult track.StartResult
 	trackResult   track.Track
@@ -65,6 +68,9 @@ func (s *stubApp) Convert(ctx context.Context, videoID string, equivalent bool) 
 
 func (s *stubApp) LookupGenre(videoID string) (track.Track, error) {
 	s.genreLookupVideo = videoID
+	if s.genreLookupErr != nil {
+		return track.Track{}, s.genreLookupErr
+	}
 	return s.trackResult, nil
 }
 
@@ -269,6 +275,44 @@ func TestRecentPageGenreLookupButton(t *testing.T) {
 	if strings.Contains(rec.Body.String(), "genre-lookup") {
 		t.Fatalf("downloading track should not offer the genre lookup: %s", rec.Body.String())
 	}
+}
+
+func TestGenreLookupWhenMusicBrainzIsBusy(t *testing.T) {
+	app := &stubApp{genreLookupErr: fmt.Errorf("genre lookup abc123def45: %w", genre.ErrUnavailable)}
+	server, err := New(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Handler()
+
+	t.Run("json", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/tracks/abc123def45/genre-lookup", bytes.NewReader(nil))
+		req.Header.Set("Accept", "application/json")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("status = %d, want 502", rec.Code)
+		}
+		var body map[string]string
+		if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["error"] != "MusicBrainz is busy, try again in a minute" {
+			t.Fatalf("error = %q", body["error"])
+		}
+	})
+
+	t.Run("form post", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/tracks/abc123def45/genre-lookup", bytes.NewReader(nil))
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("status = %d, want 502", rec.Code)
+		}
+		if strings.TrimSpace(rec.Body.String()) != "MusicBrainz is busy, try again in a minute" {
+			t.Fatalf("body = %q", rec.Body.String())
+		}
+	})
 }
 
 func TestServerArtwork(t *testing.T) {
