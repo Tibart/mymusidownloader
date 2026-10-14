@@ -176,6 +176,12 @@ func (f *fakeMediaTool) LastConvertCall() convertCall {
 	return f.convertCalls[len(f.convertCalls)-1]
 }
 
+func (f *fakeMediaTool) LastWriteCall() writeCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.writeCalls[len(f.writeCalls)-1]
+}
+
 func TestServiceStoredRestartAndDuplicateInFlight(t *testing.T) {
 	t.Run("stored when audio exists", func(t *testing.T) {
 		library := t.TempDir()
@@ -775,4 +781,133 @@ func TestServiceAppliesEventLookupToTrackAndTags(t *testing.T) {
 	if len(mediaTool.writeCalls) == 0 || mediaTool.writeCalls[len(mediaTool.writeCalls)-1].tags.Event != tr.Event {
 		t.Fatalf("tags written without event: %+v", mediaTool.writeCalls)
 	}
+}
+
+func TestServiceAppliesGenreLookupOnlyWhenGenreIsEmpty(t *testing.T) {
+	library := t.TempDir()
+	store := NewFileStore(library)
+	mediaTool := &fakeMediaTool{}
+	downloader := &fakeDownloader{behaviors: map[string]fakeDownloadBehavior{
+		"dQw4w9WgXcQ": {title: "Band - Song", artist: "Band", codec: "mp3", ext: "mp3", bitrate: 128},
+	}}
+	service, err := NewService(library, 1, store, downloader, mediaTool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.SetGenreLookup(func(_ context.Context, artist string) (string, error) {
+		if artist != "Band" {
+			t.Fatalf("lookup got artist %q", artist)
+		}
+		return "Thrash Metal", nil
+	})
+	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{}); err != nil {
+		t.Fatal(err)
+	}
+	waitForState(t, service, "dQw4w9WgXcQ", StateDone)
+	tr, _ := service.Get("dQw4w9WgXcQ")
+	if tr.Genre != "Thrash Metal" {
+		t.Fatalf("genre = %q, want Thrash Metal", tr.Genre)
+	}
+	mediaTool.mu.Lock()
+	defer mediaTool.mu.Unlock()
+	if len(mediaTool.writeCalls) == 0 || mediaTool.writeCalls[len(mediaTool.writeCalls)-1].tags.Genre != "Thrash Metal" {
+		t.Fatalf("tags written without genre: %+v", mediaTool.writeCalls)
+	}
+}
+
+func TestServiceGenreLookupFailureDoesNotFailDownload(t *testing.T) {
+	library := t.TempDir()
+	service, err := NewService(library, 1, NewFileStore(library), &fakeDownloader{behaviors: map[string]fakeDownloadBehavior{
+		"dQw4w9WgXcQ": {title: "Band - Song", artist: "Band", codec: "mp3", ext: "mp3", bitrate: 128},
+	}}, &fakeMediaTool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.SetGenreLookup(func(_ context.Context, _ string) (string, error) {
+		return "", errors.New("musicbrainz status 503")
+	})
+	if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{}); err != nil {
+		t.Fatal(err)
+	}
+	waitForState(t, service, "dQw4w9WgXcQ", StateDone)
+	if tr, _ := service.Get("dQw4w9WgXcQ"); tr.Genre != "" {
+		t.Fatalf("genre = %q, want empty", tr.Genre)
+	}
+}
+
+func TestLookupGenreAction(t *testing.T) {
+	newDoneService := func(t *testing.T) (*Service, *fakeMediaTool) {
+		t.Helper()
+		library := t.TempDir()
+		mediaTool := &fakeMediaTool{}
+		service, err := NewService(library, 1, NewFileStore(library), &fakeDownloader{behaviors: map[string]fakeDownloadBehavior{
+			"dQw4w9WgXcQ": {title: "Band - Song", artist: "Band", codec: "mp3", ext: "mp3", bitrate: 128},
+		}}, mediaTool)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{}); err != nil {
+			t.Fatal(err)
+		}
+		waitForState(t, service, "dQw4w9WgXcQ", StateDone)
+		return service, mediaTool
+	}
+
+	t.Run("sets genre and rewrites tags", func(t *testing.T) {
+		service, mediaTool := newDoneService(t)
+		service.SetGenreLookup(func(_ context.Context, _ string) (string, error) { return "Thrash Metal", nil })
+		before := mediaTool.WriteCount()
+		tr, err := service.LookupGenre("dQw4w9WgXcQ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tr.Genre != "Thrash Metal" {
+			t.Fatalf("genre = %q", tr.Genre)
+		}
+		if mediaTool.WriteCount() != before+1 {
+			t.Fatalf("write calls = %d, want %d", mediaTool.WriteCount(), before+1)
+		}
+		if mediaTool.LastWriteCall().tags.Genre != "Thrash Metal" {
+			t.Fatalf("tags = %+v", mediaTool.LastWriteCall().tags)
+		}
+	})
+
+	t.Run("keeps current genre when nothing is found", func(t *testing.T) {
+		service, mediaTool := newDoneService(t)
+		if _, err := service.Update("dQw4w9WgXcQ", "Band - Song", "Band", "Rock", "", false); err != nil {
+			t.Fatal(err)
+		}
+		service.SetGenreLookup(func(_ context.Context, _ string) (string, error) { return "", nil })
+		before := mediaTool.WriteCount()
+		tr, err := service.LookupGenre("dQw4w9WgXcQ")
+		if err != nil || tr.Genre != "Rock" {
+			t.Fatalf("LookupGenre = %q, %v; want Rock", tr.Genre, err)
+		}
+		if mediaTool.WriteCount() != before {
+			t.Fatalf("tags rewritten without a new genre")
+		}
+	})
+
+	t.Run("rejected while downloading and unknown track", func(t *testing.T) {
+		library := t.TempDir()
+		block := make(chan struct{})
+		defer close(block)
+		service, err := NewService(library, 1, NewFileStore(library), &fakeDownloader{behaviors: map[string]fakeDownloadBehavior{
+			"dQw4w9WgXcQ": {title: "Band - Song", artist: "Band", codec: "mp3", ext: "mp3", bitrate: 128, block: block},
+		}}, &fakeMediaTool{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		service.SetGenreLookup(func(_ context.Context, _ string) (string, error) { return "Thrash Metal", nil })
+		if _, err := service.Trigger(context.Background(), "dQw4w9WgXcQ", Cut{}); err != nil {
+			t.Fatal(err)
+		}
+		waitForState(t, service, "dQw4w9WgXcQ", StateDownloading)
+		if _, err := service.LookupGenre("dQw4w9WgXcQ"); !errors.Is(err, ErrInvalidTransition) {
+			t.Fatalf("LookupGenre while downloading = %v, want ErrInvalidTransition", err)
+		}
+		if _, err := service.LookupGenre("missing11111"); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("LookupGenre unknown = %v, want ErrNotFound", err)
+		}
+	})
 }

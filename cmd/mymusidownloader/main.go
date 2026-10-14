@@ -13,6 +13,7 @@ import (
 
 	"mymusidownloader/internal/config"
 	"mymusidownloader/internal/downloader"
+	"mymusidownloader/internal/genre"
 	"mymusidownloader/internal/setlist"
 	"mymusidownloader/internal/track"
 	"mymusidownloader/internal/version"
@@ -54,6 +55,7 @@ func main() {
 	if cfg.SetlistFMKey != "" {
 		svc.SetEventLookup(setlist.Lookup(setlist.NewClient(cfg.SetlistFMKey)))
 	}
+	svc.SetGenreLookup(genre.Lookup(genre.NewClient(version.Current), svc.Genres))
 
 	server, err := web.New(svc)
 	if err != nil {

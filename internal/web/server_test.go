@@ -25,6 +25,8 @@ type stubApp struct {
 	cancelVideo  string
 	restartVideo string
 
+	genreLookupVideo string
+
 	triggerResult track.StartResult
 	trackResult   track.Track
 	recentTracks  []track.Track
@@ -58,6 +60,11 @@ func (s *stubApp) Delete(videoID string) error {
 }
 
 func (s *stubApp) Convert(ctx context.Context, videoID string, equivalent bool) (track.Track, error) {
+	return s.trackResult, nil
+}
+
+func (s *stubApp) LookupGenre(videoID string) (track.Track, error) {
+	s.genreLookupVideo = videoID
 	return s.trackResult, nil
 }
 
@@ -181,6 +188,27 @@ func TestServerRoutes(t *testing.T) {
 			},
 		},
 		{
+			name:       "genre lookup route",
+			method:     http.MethodPost,
+			target:     "/tracks/abc123def45/genre-lookup",
+			contentTyp: "application/json",
+			check: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				if rec.Code != http.StatusOK {
+					t.Fatalf("status = %d, want 200", rec.Code)
+				}
+				if app.genreLookupVideo != "abc123def45" {
+					t.Fatalf("genre lookup video = %q", app.genreLookupVideo)
+				}
+				var tr track.Track
+				if err := json.NewDecoder(rec.Body).Decode(&tr); err != nil {
+					t.Fatal(err)
+				}
+				if tr.Genre != "Genre" {
+					t.Fatalf("genre = %q", tr.Genre)
+				}
+			},
+		},
+		{
 			name:   "recent page",
 			method: http.MethodGet,
 			target: "/",
@@ -216,6 +244,30 @@ func TestServerRoutes(t *testing.T) {
 			handler.ServeHTTP(rec, req)
 			tt.check(t, rec)
 		})
+	}
+}
+
+func TestRecentPageGenreLookupButton(t *testing.T) {
+	done := &stubApp{recentTracks: []track.Track{{VideoID: "abc123def45", Title: "Done", State: track.StateDone}}}
+	doneServer, err := New(done)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	doneServer.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if !strings.Contains(rec.Body.String(), `action="/tracks/abc123def45/genre-lookup"`) {
+		t.Fatalf("done track missing the genre lookup form: %s", rec.Body.String())
+	}
+
+	busy := &stubApp{recentTracks: []track.Track{{VideoID: "abc123def45", Title: "Busy", State: track.StateDownloading}}}
+	busyServer, err := New(busy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec = httptest.NewRecorder()
+	busyServer.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if strings.Contains(rec.Body.String(), "genre-lookup") {
+		t.Fatalf("downloading track should not offer the genre lookup: %s", rec.Body.String())
 	}
 }
 

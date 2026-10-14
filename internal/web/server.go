@@ -18,6 +18,7 @@ type App interface {
 	Cancel(videoID string) (track.Track, error)
 	Restart(ctx context.Context, videoID string) (track.StartResult, error)
 	Convert(ctx context.Context, videoID string, equivalent bool) (track.Track, error)
+	LookupGenre(videoID string) (track.Track, error)
 	Delete(videoID string) error
 	Recent() ([]track.Track, bool)
 	ArtworkPath(videoID string) (string, bool)
@@ -125,6 +126,8 @@ func (s *Server) handleTrackAction(w http.ResponseWriter, r *http.Request) {
 		s.handleConvert(w, r, videoID)
 	case "delete":
 		s.handleDelete(w, r, videoID)
+	case "genre-lookup":
+		s.handleGenreLookup(w, r, videoID)
 	default:
 		http.NotFound(w, r)
 	}

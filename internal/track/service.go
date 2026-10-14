@@ -58,6 +58,9 @@ type MediaTool interface {
 // EventLookup returns a short live-event description for artist, release year and title, or "" when none matches.
 type EventLookup func(ctx context.Context, artist, year, title string) (string, error)
 
+// GenreLookup returns a genre for an artist, or "" when none matches.
+type GenreLookup func(ctx context.Context, artist string) (string, error)
+
 type Service struct {
 	mu            sync.Mutex
 	library       string
@@ -67,6 +70,7 @@ type Service struct {
 	mediaTool     MediaTool
 	now           func() time.Time
 	eventLookup   EventLookup
+	genreLookup   GenreLookup
 
 	tracks  map[string]*Track
 	queue   []string
@@ -400,6 +404,7 @@ func (s *Service) runTrack(ctx context.Context, videoID, url string) {
 	}
 
 	s.applyEvent(ctx, videoID, &tags)
+	s.applyGenre(ctx, videoID, &tags)
 	finalName, storedCodec, storeErr := s.storeMedia(ctx, videoID, mediaFile, titleForName, startedAt, tags)
 	if storeErr != nil {
 		cleanup := mediaFile.Path
@@ -514,6 +519,107 @@ func (s *Service) applyEvent(ctx context.Context, videoID string, tags *Tags) {
 		log.Printf("save event %s: %v", videoID, err)
 	}
 	tags.Event = event
+}
+
+func (s *Service) SetGenreLookup(lookup GenreLookup) {
+	s.genreLookup = lookup
+}
+
+// applyGenre fills an empty genre from the lookup. A failed lookup never fails the download.
+func (s *Service) applyGenre(ctx context.Context, videoID string, tags *Tags) {
+	if s.genreLookup == nil {
+		return
+	}
+	s.mu.Lock()
+	tr, ok := s.tracks[videoID]
+	if !ok {
+		s.mu.Unlock()
+		return
+	}
+	artist, current := strings.TrimSpace(tr.Artist), strings.TrimSpace(tr.Genre)
+	s.mu.Unlock()
+	if artist == "" || current != "" {
+		return
+	}
+	genre, err := s.genreLookup(ctx, artist)
+	if err != nil {
+		log.Printf("genre lookup %s: %v", videoID, err)
+		return
+	}
+	if genre == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tr, ok = s.tracks[videoID]
+	if !ok {
+		return
+	}
+	tr.Genre = genre
+	if err := s.store.Save(*tr); err != nil {
+		log.Printf("save genre %s: %v", videoID, err)
+	}
+	tags.Genre = genre
+	log.Printf("genre %s: %q for artist %q", videoID, genre, artist)
+}
+
+// LookupGenre asks the lookup for a genre and keeps the current one when nothing is found.
+func (s *Service) LookupGenre(videoID string) (Track, error) {
+	s.mu.Lock()
+	tr, ok := s.tracks[videoID]
+	if !ok {
+		s.mu.Unlock()
+		return Track{}, ErrNotFound
+	}
+	if tr.State == StateQueued || tr.State == StateDownloading || tr.State == StateConverting {
+		s.mu.Unlock()
+		return Track{}, ErrInvalidTransition
+	}
+	current := *tr
+	hasAudio := s.hasAudioFileLocked(tr)
+	lookup := s.genreLookup
+	s.mu.Unlock()
+
+	artist := strings.TrimSpace(current.Artist)
+	if lookup == nil || artist == "" {
+		return current, nil
+	}
+	genre, err := lookup(context.Background(), artist)
+	if err != nil {
+		return Track{}, err
+	}
+	if genre == "" || genre == current.Genre {
+		return current, nil
+	}
+
+	s.mu.Lock()
+	tr, ok = s.tracks[videoID]
+	if !ok {
+		s.mu.Unlock()
+		return Track{}, ErrNotFound
+	}
+	if tr.State == StateQueued || tr.State == StateDownloading || tr.State == StateConverting {
+		s.mu.Unlock()
+		return Track{}, ErrInvalidTransition
+	}
+	hasAudio = s.hasAudioFileLocked(tr)
+	tr.Genre = genre
+	tr.TouchedAt = s.now()
+	if err := s.store.Save(*tr); err != nil {
+		s.mu.Unlock()
+		return Track{}, err
+	}
+	updated := *tr
+	tags := s.tagsFor(tr)
+	s.mu.Unlock()
+
+	log.Printf("genre %s: %q for artist %q", videoID, genre, artist)
+	if hasAudio {
+		if err := s.mediaTool.WriteTags(context.Background(), updated.AudioPath(s.library), tags); err != nil {
+			return Track{}, err
+		}
+	}
+	return updated, nil
 }
 
 func (s *Service) cutFor(videoID string) Cut {

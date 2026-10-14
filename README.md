@@ -110,6 +110,8 @@ The album comes from YouTube metadata when present and the track has none. The `
 
 Live tracks: a title with `Live at X` or `@ X` (venue) is looked up on setlist.fm by artist and release year. A match must have the same artist name and a venue containing X. The venue, city, country, date and setlist URL go into the `comment` tag and the `event` field in the JSON record. No match means nothing is added.
 
+Genre: when the genre is empty, the download looks up the artist on MusicBrainz (no API key needed) and takes its most-used genre-like tag. `POST /tracks/{videoId}/genre-lookup` does the same on demand. A miss leaves the genre empty.
+
 The artist comes from YouTube metadata when present. Otherwise it is the text before a spaced dash in the title (`Artist - Song`). With no such dash it stays empty. Edits you save are kept.
 
 An empty album name becomes the title. Check Various Artists to write the album artist as `Various Artists`. Players group tracks only when both the album name and the album artist match.

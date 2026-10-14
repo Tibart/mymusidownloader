@@ -104,6 +104,19 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request, videoID st
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+func (s *Server) handleGenreLookup(w http.ResponseWriter, r *http.Request, videoID string) {
+	tr, err := s.app.LookupGenre(videoID)
+	if err != nil {
+		writeTrackError(w, r, err)
+		return
+	}
+	if wantsJSON(r) {
+		writeJSON(w, http.StatusOK, tr)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
 func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request, videoID string) {
 	result, err := s.app.Restart(r.Context(), videoID)
 	if err != nil {
