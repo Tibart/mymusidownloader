@@ -27,8 +27,9 @@ type App interface {
 var videoIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)
 
 type Server struct {
-	app  App
-	tmpl *template.Template
+	app   App
+	tmpl  *template.Template
+	tints *tintCache
 }
 
 func New(app App) (*Server, error) {
@@ -36,7 +37,7 @@ func New(app App) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Server{app: app, tmpl: tmpl}, nil
+	return &Server{app: app, tmpl: tmpl, tints: newTintCache()}, nil
 }
 
 func (s *Server) Handler() http.Handler {
@@ -54,10 +55,7 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tracks, refresh := s.app.Recent()
-	views := newTrackViews(tracks, func(videoID string) bool {
-		_, ok := s.app.ArtworkPath(videoID)
-		return ok
-	})
+	views := newTrackViews(tracks, s.app.ArtworkPath, s.tints)
 	data := struct {
 		Tracks  []trackView
 		Refresh bool

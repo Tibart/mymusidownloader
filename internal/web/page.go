@@ -11,9 +11,11 @@ import (
 var pageHTML string
 
 // trackView adds display-only fields to a Track for the Recent page template.
+// TintCSS is a "--tint: r, g, b" custom property taken from the cover.
 type trackView struct {
 	track.Track
 	HasArtwork bool
+	TintCSS    template.CSS
 }
 
 func parsePageTemplate() (*template.Template, error) {
@@ -36,10 +38,15 @@ func parsePageTemplate() (*template.Template, error) {
 	}).Parse(pageHTML)
 }
 
-func newTrackViews(tracks []track.Track, hasArtwork func(videoID string) bool) []trackView {
+func newTrackViews(tracks []track.Track, artworkPath func(videoID string) (string, bool), tints *tintCache) []trackView {
 	views := make([]trackView, len(tracks))
 	for i, tr := range tracks {
-		views[i] = trackView{Track: tr, HasArtwork: hasArtwork(tr.VideoID)}
+		path, ok := artworkPath(tr.VideoID)
+		view := trackView{Track: tr, HasArtwork: ok}
+		if ok {
+			view.TintCSS = tints.css(path)
+		}
+		views[i] = view
 	}
 	return views
 }

@@ -37,7 +37,7 @@
 
     <ul class="tracks">
       {{range .Tracks}}
-      <li class="track" data-state="{{.State}}">
+      <li class="track" data-state="{{.State}}" style="{{.TintCSS}}">
         <div class="side">
           <div class="art">
             {{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener noreferrer">{{end}}
