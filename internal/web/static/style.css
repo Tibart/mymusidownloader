@@ -127,9 +127,10 @@ button:active { transform: translateY(1px); }
 
 .track {
   --art: 112px;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: 0;
   background: var(--surface);
   background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 16%, var(--surface));
   border: 1px solid var(--border);
@@ -143,6 +144,85 @@ button:active { transform: translateY(1px); }
 .track[data-state="cancelled"] { border-left-color: var(--muted); }
 @media (prefers-color-scheme: dark) {
   .track { background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 24%, var(--surface)); }
+}
+
+/* Folding. A card is folded when the script marked it so, or when it sits past the third card
+   and the script has not opened it. The second half of that pair is the no-script default. */
+.full {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows var(--fold-dur, 0s) ease, opacity var(--fold-dur, 0s) ease, visibility 0s;
+}
+.full-body { display: flex; flex-direction: column; gap: 0.9rem; min-height: 0; overflow: hidden; }
+.tracks > li.track:is(.folded, :nth-child(n+4):not(.unfolded)) > .full {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition-delay: 0s, 0s, var(--fold-dur, 0s);
+}
+.tracks > li.track:is(.folded, :nth-child(n+4):not(.unfolded)) > .fold-toggle { display: none; }
+.tracks > li.track:is(.folded, :nth-child(n+4):not(.unfolded)) > .summary { display: flex; animation: summary-in var(--fold-dur, 0s) ease both; }
+@keyframes summary-in { from { opacity: 0; } to { opacity: 1; } }
+.fold-motion .tracks { --fold-dur: 0.28s; }
+@media (prefers-reduced-motion: reduce) {
+  .fold-motion .tracks { --fold-dur: 0s; }
+}
+
+.summary {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.15rem;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.1rem 0.15rem;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.summary:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.sum-title, .sum-artist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sum-title { font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; }
+.sum-artist { font-size: 0.85rem; color: var(--muted); }
+.sum-artist:empty { display: none; }
+
+/* The chevron straddles the top border: a 44px hit area around a compact tinted pill. */
+.fold-toggle {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 45%, black);
+}
+.fold-toggle::before {
+  content: "";
+  position: absolute;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 40%, var(--border));
+  background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 16%, var(--surface));
+  transition: background var(--fold-dur, 0s) ease;
+}
+.fold-toggle svg { position: relative; display: block; }
+.fold-toggle:hover::before { background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 30%, var(--surface)); }
+.fold-toggle:active { transform: translate(-50%, calc(-50% + 1px)); }
+.fold-toggle:focus-visible { outline: none; }
+.fold-toggle:focus-visible::before { outline: 2px solid var(--text); outline-offset: 2px; }
+@media (prefers-color-scheme: dark) {
+  .fold-toggle { color: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 45%, white); }
+  .fold-toggle::before { background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 24%, var(--surface)); }
+  .fold-toggle:hover::before { background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 38%, var(--surface)); }
 }
 
 .art { flex: 0 0 auto; width: var(--art); height: var(--art); }

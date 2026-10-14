@@ -37,7 +37,11 @@
 
     <ul class="tracks">
       {{range .Tracks}}
-      <li class="track" data-state="{{.State}}" style="{{.TintCSS}}">
+      <li class="track" data-state="{{.State}}" data-id="{{.VideoID}}" style="{{.TintCSS}}">
+        <button type="button" class="fold-toggle" aria-label="Fold" aria-expanded="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><path d="M4.5 7.75 10 13.25l5.5-5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+        <div class="full"><div class="full-body">
         <div class="side">
           <div class="art">
             {{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener noreferrer">{{end}}
@@ -95,6 +99,11 @@
           </div>
           {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
         </div>
+        </div></div>
+        <div class="summary">
+          <span class="sum-title">{{.Title}}</span>
+          <span class="sum-artist">{{.Artist}}</span>
+        </div>
       </li>
       {{else}}
       <li class="empty">No tracks touched in the last month.</li>
@@ -137,6 +146,53 @@
       });
       input.addEventListener('change', commit);
     });
+    var foldKey = 'musi-fold';
+    var folds = {};
+    try { folds = JSON.parse(sessionStorage.getItem(foldKey)) || {}; } catch (e) { folds = {}; }
+    function markFold(li, folded) {
+      li.classList.toggle('folded', folded);
+      li.classList.toggle('unfolded', !folded);
+      var summary = li.querySelector('.summary');
+      var toggle = li.querySelector('.fold-toggle');
+      if (toggle) toggle.setAttribute('aria-expanded', folded ? 'false' : 'true');
+      if (!summary) return;
+      if (folded) {
+        summary.setAttribute('role', 'button');
+        summary.setAttribute('tabindex', '0');
+        summary.setAttribute('aria-expanded', 'false');
+      } else {
+        summary.removeAttribute('role');
+        summary.removeAttribute('tabindex');
+        summary.removeAttribute('aria-expanded');
+      }
+    }
+    function setFold(li, folded) {
+      markFold(li, folded);
+      var id = li.dataset.id;
+      if (!id) return;
+      folds[id] = folded ? 'folded' : 'open';
+      try { sessionStorage.setItem(foldKey, JSON.stringify(folds)); } catch (e) {}
+    }
+    document.querySelectorAll('.tracks > li.track').forEach(function (li, index) {
+      var stored = folds[li.dataset.id];
+      markFold(li, stored ? stored === 'folded' : index >= 3);
+      var toggle = li.querySelector('.fold-toggle');
+      if (toggle) toggle.addEventListener('click', function () { setFold(li, true); });
+      li.addEventListener('click', function (event) {
+        if (!li.classList.contains('folded')) return;
+        if (event.target.closest('input, select, textarea, button, a, form, label')) return;
+        setFold(li, false);
+      });
+      var summary = li.querySelector('.summary');
+      if (summary) summary.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
+        event.preventDefault();
+        setFold(li, false);
+      });
+    });
+    // Transitions stay off until the stored state is painted, so a reload every few seconds does not animate.
+    requestAnimationFrame(function () { document.documentElement.classList.add('fold-motion'); });
+
     var refresh = document.querySelector('meta[http-equiv="refresh"]');
     if (refresh) {
       document.addEventListener('focusin', function (event) {
