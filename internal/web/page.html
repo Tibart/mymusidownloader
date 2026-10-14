@@ -151,6 +151,38 @@
         }, 200);
       });
     }
+    var scrollKey = 'musi-scroll';
+    var saved = sessionStorage.getItem(scrollKey);
+    if (saved !== null) {
+      sessionStorage.removeItem(scrollKey);
+      window.scrollTo(0, Number(saved) || 0);
+    }
+    var lastVersion = null;
+    function checkVersion() {
+      var active = document.activeElement;
+      if (active && active.closest && active.closest('input, select, textarea')) return;
+      fetch('/version', { cache: 'no-store' }).then(function (r) {
+        return r.ok ? r.text() : null;
+      }).then(function (v) {
+        if (v === null) return;
+        if (lastVersion === null) { lastVersion = v; return; }
+        if (v !== lastVersion) location.reload();
+      }).catch(function () {});
+    }
+    setInterval(checkVersion, 5000);
+    window.addEventListener('pagehide', function () {
+      sessionStorage.setItem(scrollKey, String(window.scrollY));
+    });
+    var startY = null;
+    window.addEventListener('touchstart', function (event) {
+      startY = window.scrollY === 0 && !event.target.closest('input, select, textarea') ? event.touches[0].clientY : null;
+    }, { passive: true });
+    window.addEventListener('touchend', function (event) {
+      if (startY === null) return;
+      var dy = event.changedTouches[0].clientY - startY;
+      startY = null;
+      if (dy > 80 && window.scrollY === 0) location.reload();
+    }, { passive: true });
   </script>
 </body>
 </html>

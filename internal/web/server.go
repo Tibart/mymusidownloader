@@ -2,6 +2,8 @@ package web
 
 import (
 	"context"
+	"fmt"
+	"hash/fnv"
 	"html/template"
 	"net/http"
 	"regexp"
@@ -45,6 +47,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleRoot)
 	mux.HandleFunc("/trigger", s.handleTrigger)
+	mux.HandleFunc("/version", s.handleVersion)
 	mux.HandleFunc("/tracks/", s.handleTrackAction)
 	mux.Handle("/static/", staticHandler())
 	return mux
@@ -69,6 +72,18 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 	if err := s.tmpl.Execute(w, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// handleVersion returns a hash of the recent track list so an open page can reload when it changes.
+func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
+	tracks, _ := s.app.Recent()
+	h := fnv.New64a()
+	for _, tr := range tracks {
+		fmt.Fprintf(h, "%s|%s|%d|%s|%s\n", tr.VideoID, tr.State, tr.TouchedAt.UnixNano(), tr.Title, tr.FileName)
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprintf(w, "%x", h.Sum64())
 }
 
 func (s *Server) handleTrigger(w http.ResponseWriter, r *http.Request) {

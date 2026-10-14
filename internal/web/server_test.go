@@ -494,3 +494,26 @@ func TestTriggerRejectsBadCutTime(t *testing.T) {
 		t.Fatalf("status = %d, want 400", rec.Code)
 	}
 }
+
+func TestVersionChangesWhenTracksChange(t *testing.T) {
+	app := &stubApp{recentTracks: []track.Track{{VideoID: "dQw4w9WgXcQ", State: track.StateQueued, TouchedAt: time.Unix(1, 0)}}}
+	server, err := New(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Handler()
+	get := func() string {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/version", nil))
+		return rec.Body.String()
+	}
+	first := get()
+	if get() != first {
+		t.Fatal("version changed without a change")
+	}
+	app.recentTracks[0].State = track.StateDone
+	app.recentTracks[0].TouchedAt = time.Unix(2, 0)
+	if get() == first {
+		t.Fatal("version did not change after a track update")
+	}
+}
