@@ -101,12 +101,6 @@ button.primary {
   font-weight: 600;
 }
 button.primary:hover { background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 55%, black); }
-.trigger-row button {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-contrast);
-  font-weight: 600;
-}
 /* Delete keeps the secondary shape, fill and hover; only label and border carry 30% of the
    danger hue. That is the weakest mix that still reads as destructive and stays above 4.5:1
    on every tint (worst case 4.54 on a cyan cover, against the base button's own 4.76). */
