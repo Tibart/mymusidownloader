@@ -34,15 +34,9 @@ body {
   min-height: 100dvh;
 }
 
-.topbar {
-  padding: calc(env(safe-area-inset-top) + 0.75rem) 1.25rem 0.75rem;
-  position: sticky;
-  top: 0;
-  background: var(--bg);
-  z-index: 5;
-  border-bottom: 1px solid var(--border);
-}
-.topbar h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+.brand-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; }
+.brand-head h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+.brand { width: 36px; height: 36px; flex: 0 0 auto; }
 
 main { max-width: 900px; margin: 0 auto; padding: 1rem 1.25rem 2rem; }
 
@@ -56,7 +50,7 @@ main { max-width: 900px; margin: 0 auto; padding: 1rem 1.25rem 2rem; }
 }
 
 .trigger {
-  background: var(--surface);
+  background: color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 16%, var(--surface));
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1rem;

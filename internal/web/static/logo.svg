@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0" stop-color="#363D66"/>
+      <stop offset="1" stop-color="#1A1E36"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#F2B35E" stop-opacity="0.52"/>
+      <stop offset="0.55" stop-color="#F2B35E" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#F2B35E" stop-opacity="0.03"/>
+    </linearGradient>
+    <clipPath id="clip"><rect width="1024" height="1024" rx="228"/></clipPath>
+  </defs>
+
+  <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
+
+  <g clip-path="url(#clip)">
+    <path d="M452 0 H572 L1024 1024 H0 Z" fill="url(#beam)"/>
+
+    <g transform="translate(512 512) scale(1.06 1.14) translate(-512 -512) translate(0 26)" fill="none" stroke="#F2B35E" stroke-width="76"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M204 330 H444"/>
+      <path d="M204 330 V600"/>
+      <path d="M444 330 V600"/>
+      <path d="M754 334 V636"/>
+      <path d="M584 466 L754 636 L924 466"/>
+    </g>
+    <g transform="translate(512 512) scale(1.06 1.14) translate(-512 -512) translate(0 26)" fill="#F2B35E">
+      <ellipse cx="162" cy="620" rx="70" ry="56" transform="rotate(-20 162 620)"/>
+      <ellipse cx="402" cy="620" rx="70" ry="56" transform="rotate(-20 402 620)"/>
+    </g>
+  </g>
+</svg>

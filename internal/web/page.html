@@ -12,18 +12,20 @@
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f1016">
   <link rel="manifest" href="/static/manifest.json">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
   <link rel="stylesheet" href="/static/style.css">
   {{if .Refresh}}<meta http-equiv="refresh" content="5">{{end}}
 </head>
 <body>
-  <header class="topbar">
-    <h1>My Musi Downloader</h1>
-  </header>
   <main>
     {{if .Notice}}<p class="notice">{{.Notice}}</p>{{end}}
 
-    <form class="trigger" method="post" action="/trigger">
+    <form class="trigger" style="--tint: 54, 61, 102" method="post" action="/trigger">
+      <div class="brand-head">
+        <img class="brand" src="/static/logo.svg" alt="" width="36" height="36">
+        <h1>My Musi Downloader</h1>
+      </div>
       <label for="url">YouTube watch URL or video id</label>
       <div class="trigger-row">
         <input id="url" type="text" name="url" required placeholder="https://youtu.be/...">

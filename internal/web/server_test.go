@@ -446,8 +446,8 @@ func TestRecentPageArtworkRendering(t *testing.T) {
 	rec = httptest.NewRecorder()
 	withoutArtServer.Handler().ServeHTTP(rec, req)
 	body = rec.Body.String()
-	if strings.Contains(body, "<img") {
-		t.Fatalf("expected placeholder, not an img tag, when no artwork exists: %s", body)
+	if strings.Contains(body, `<img src="/tracks/`) {
+		t.Fatalf("expected placeholder, not a cover img, when no artwork exists, when no artwork exists: %s", body)
 	}
 	if !strings.Contains(body, "art-placeholder") {
 		t.Fatalf("expected placeholder element: %s", body)
