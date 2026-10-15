@@ -113,9 +113,16 @@ button.primary:hover { background: color-mix(in srgb, rgb(var(--tint, 120, 120, 
   color: var(--accent-contrast);
   font-weight: 600;
 }
-/* Opaque surface under the danger text keeps it readable whatever the tint is. */
-button.danger { color: var(--danger); border-color: var(--danger); background: var(--surface); }
-button.danger:hover, button.danger:active { background: var(--danger); color: var(--accent-contrast); }
+/* Delete keeps the secondary shape, fill and hover; only label and border carry 30% of the
+   danger hue. That is the weakest mix that still reads as destructive and stays above 4.5:1
+   on every tint (worst case 4.54 on a cyan cover, against the base button's own 4.76). */
+button.danger {
+  border-color: color-mix(in srgb, var(--danger) 30%, color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 40%, var(--border)));
+  color: color-mix(in srgb, var(--danger) 30%, color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 45%, black));
+}
+@media (prefers-color-scheme: dark) {
+  button.danger { color: color-mix(in srgb, var(--danger) 30%, color-mix(in srgb, rgb(var(--tint, 120, 120, 120)) 45%, white)); }
+}
 button.small { padding: 0.3rem 0.5rem; font-size: 0.8rem; white-space: nowrap; }
 button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 button:active { transform: translateY(1px); }
