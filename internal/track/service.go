@@ -938,29 +938,12 @@ func (s *Service) finishConvert(videoID, sourcePath, title string, startedAt tim
 	tags.BitrateKbps = bitrate
 	candidateName, finalPath, err := s.audioDestination(tags, startedAt, title, videoID, "m4a")
 	if err != nil {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		tr, ok := s.tracks[videoID]
-		if ok {
-			tr.State = StateDone
-			tr.Error = err.Error()
-			tr.TouchedAt = s.now()
-			_ = s.store.Save(*tr)
-		}
+		s.failConvert(videoID, err)
 		return
 	}
 	if err := s.mediaTool.ConvertToAAC(context.Background(), sourcePath, finalPath, bitrate, tags); err != nil {
 		_ = os.Remove(finalPath)
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		tr, ok := s.tracks[videoID]
-		if !ok {
-			return
-		}
-		tr.State = StateDone
-		tr.Error = err.Error()
-		tr.TouchedAt = s.now()
-		_ = s.store.Save(*tr)
+		s.failConvert(videoID, err)
 		return
 	}
 	if finalPath != sourcePath {
@@ -978,7 +961,23 @@ func (s *Service) finishConvert(videoID, sourcePath, title string, startedAt tim
 	current.State = StateDone
 	current.Error = ""
 	current.TouchedAt = s.now()
+	s.notify("Converted", notifyLabel(current))
 	_ = s.store.Save(*current)
+}
+
+// failConvert keeps the track playable as its source file and reports the error.
+func (s *Service) failConvert(videoID string, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tr, ok := s.tracks[videoID]
+	if !ok {
+		return
+	}
+	tr.State = StateDone
+	tr.Error = err.Error()
+	tr.TouchedAt = s.now()
+	s.notify("Conversion failed", notifyLabel(tr)+": "+err.Error())
+	_ = s.store.Save(*tr)
 }
 
 func (s *Service) storeAAC(ctx context.Context, videoID string, downloaded DownloadedMedia, title string, startedAt time.Time, tags Tags) (string, string, error) {

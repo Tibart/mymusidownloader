@@ -28,7 +28,7 @@ Open `http://127.0.0.1:6874/`. That sample config binds to localhost, so another
 
 ## Notifications (ntfy)
 
-Set `ntfyUrl` and `ntfyTopic` in `config.json` to get a notification when a download finishes or fails. Run ntfy on the Pi with `packaging/ntfy.sample.container`. Use a long random topic name, since anyone who knows it can read it. Install the ntfy app on the phone, add the server address, and subscribe to the topic.
+Set `ntfyUrl` and `ntfyTopic` in `config.json` to get a notification when a download is ready, when an AAC conversion is ready, and on any error. Run ntfy on the Pi with `packaging/ntfy.sample.container`. Use a long random topic name, since anyone who knows it can read it. Install the ntfy app on the phone, add the server address, and subscribe to the topic.
 
 On iOS, self-hosted ntfy needs `NTFY_UPSTREAM_BASE_URL=https://ntfy.sh` to deliver instantly. ntfy.sh only receives a poll ID, not the message text. Without it the app checks in the background and can be late.
 

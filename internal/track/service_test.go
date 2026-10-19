@@ -920,3 +920,37 @@ func TestLookupGenreAction(t *testing.T) {
 		}
 	})
 }
+
+func TestServiceNotifiesOnFailedDownload(t *testing.T) {
+	library := t.TempDir()
+	store := NewFileStore(library)
+	downloader := &fakeDownloader{behaviors: map[string]fakeDownloadBehavior{
+		"dQw4w9WgXcQ": {title: "Broken", artist: "Band", err: errors.New("boom"), codec: "mp3", ext: "mp3", bitrate: 128},
+	}}
+	service, err := NewService(library, 1, store, downloader, &fakeMediaTool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var titles []string
+	service.SetNotifier(func(_ context.Context, title, body string) error {
+		mu.Lock()
+		defer mu.Unlock()
+		titles = append(titles, title+"|"+body)
+		return nil
+	})
+	if _, err := service.Trigger(context.Background(), youtube.WatchURL("dQw4w9WgXcQ"), Cut{}); err != nil {
+		t.Fatal(err)
+	}
+	waitForState(t, service, "dQw4w9WgXcQ", StateFailed)
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(titles) == 1
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	if !strings.HasPrefix(titles[0], "Download failed|") {
+		t.Fatalf("notifications = %v", titles)
+	}
+}
