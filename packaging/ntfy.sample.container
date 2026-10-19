@@ -1,0 +1,21 @@
+# Copy to /etc/containers/systemd/ntfy.container on the Pi, then:
+#   sudo mkdir -p /var/lib/ntfy/cache
+#   sudo systemctl daemon-reload && sudo systemctl enable --now ntfy
+# Replace TAILSCALE_IP with the Pi's Tailscale address. Bind only to that address.
+[Unit]
+Description=ntfy notifications
+
+[Container]
+Image=docker.io/binwiederhier/ntfy:latest
+Exec=serve
+PublishPort=TAILSCALE_IP:8090:80
+Volume=/var/lib/ntfy/cache:/var/cache/ntfy
+Environment=NTFY_BASE_URL=http://TAILSCALE_IP:8090
+Environment=NTFY_CACHE_FILE=/var/cache/ntfy/cache.db
+Environment=NTFY_UPSTREAM_BASE_URL=https://ntfy.sh
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

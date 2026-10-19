@@ -28,6 +28,8 @@ type Config struct {
 	YTDLPPath     string `json:"ytDlpPath"`
 	FFmpegPath    string `json:"ffmpegPath"`
 	SetlistFMKey  string `json:"setlistFmApiKey"`
+	NtfyURL       string `json:"ntfyUrl"`
+	NtfyTopic     string `json:"ntfyTopic"`
 }
 
 func Load(path string) (Config, error) {

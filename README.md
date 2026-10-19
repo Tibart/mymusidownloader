@@ -26,6 +26,12 @@ go run ./cmd/mymusidownloader --config packaging/config.sample.json
 
 Open `http://127.0.0.1:6874/`. That sample config binds to localhost, so another machine cannot open it.
 
+## Notifications (ntfy)
+
+Set `ntfyUrl` and `ntfyTopic` in `config.json` to get a notification when a download finishes or fails. Run ntfy on the Pi with `packaging/ntfy.sample.container`. Use a long random topic name, since anyone who knows it can read it. Install the ntfy app on the phone, add the server address, and subscribe to the topic.
+
+On iOS, self-hosted ntfy needs `NTFY_UPSTREAM_BASE_URL=https://ntfy.sh` to deliver instantly. ntfy.sh only receives a poll ID, not the message text. Without it the app checks in the background and can be late.
+
 ## Install as a service
 
 A first run installs the binary, the unit file, and the sample config. It does not start the service. A later run says it is an update, overwrites the binary, and restarts the service if it is already running.
@@ -89,6 +95,8 @@ If status is `203/EXEC`, the binary is not executable or is the wrong CPU. `file
 | `bind` | `127.0.0.1` | Listen address. Remove it to listen on the private-network address. |
 | `ytDlpPath` | `/usr/local/bin/yt-dlp` | `yt-dlp` binary. |
 | `ffmpegPath` | `/usr/bin/ffmpeg` | `ffmpeg` binary. |
+| `ntfyUrl` | `""` | Optional ntfy server, for example `http://TAILSCALE_IP:8090`. Empty turns notifications off. |
+| `ntfyTopic` | `""` | ntfy topic for notifications. Use a long random name. |
 | `setlistFmApiKey` | `""` | Optional setlist.fm API key. Empty turns event lookup off. Keep it out of git. |
 
 The sample values are for a local run. For the service, set `libraryPath` to `/srv/music` and `metadataPath` to `/var/lib/mymusidownloader`.

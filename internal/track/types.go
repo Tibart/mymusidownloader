@@ -74,15 +74,27 @@ func AlbumName(title, album string) string {
 	return strings.TrimSpace(title)
 }
 
-// artistTitlePattern needs spaces around the dash, so "Jay-Z" is not split.
-var artistTitlePattern = regexp.MustCompile(`^(.+?)\s+[-\x{2013}\x{2014}]\s+\S`)
+// artistTitlePatterns split on a spaced dash ("Artist - Song") or a colon ("Artist: Song").
+// The dash needs spaces around it, so "Jay-Z" is not split.
+var artistTitlePatterns = []*regexp.Regexp{
+	regexp.MustCompile(`^(.+?)\s+[-\x{2013}\x{2014}]\s+\S`),
+	regexp.MustCompile(`^(.+?):\s+\S`),
+}
 
+// ArtistFromTitle uses whichever separator comes first in the title.
 func ArtistFromTitle(title string) string {
-	m := artistTitlePattern.FindStringSubmatch(strings.TrimSpace(title))
-	if m == nil {
-		return ""
+	title = strings.TrimSpace(title)
+	artist := ""
+	for _, pattern := range artistTitlePatterns {
+		m := pattern.FindStringSubmatch(title)
+		if m == nil {
+			continue
+		}
+		if candidate := strings.TrimSpace(m[1]); artist == "" || len(candidate) < len(artist) {
+			artist = candidate
+		}
 	}
-	return strings.TrimSpace(m[1])
+	return artist
 }
 
 func AlbumArtist(artist string, various bool) string {

@@ -55,6 +55,9 @@ type MediaTool interface {
 	Cut(ctx context.Context, inputPath, outputPath string, cut Cut) error
 }
 
+// Notifier sends a title and body to the user, for example over ntfy.
+type Notifier func(ctx context.Context, title, body string) error
+
 // EventLookup returns a short live-event description for artist, release year and title, or "" when none matches.
 type EventLookup func(ctx context.Context, artist, year, title string) (string, error)
 
@@ -70,6 +73,7 @@ type Service struct {
 	mediaTool     MediaTool
 	now           func() time.Time
 	eventLookup   EventLookup
+	notifier      Notifier
 	genreLookup   GenreLookup
 
 	tracks  map[string]*Track
@@ -481,6 +485,19 @@ func (s *Service) captureMetadata(videoID string, mediaFile DownloadedMedia) (st
 	return tr.Title, tags, tr.DownloadStartedAt, nil
 }
 
+func (s *Service) SetNotifier(notifier Notifier) {
+	s.notifier = notifier
+}
+
+func (s *Service) notify(title, body string) {
+	if s.notifier == nil {
+		return
+	}
+	go func() {
+		_ = s.notifier(context.Background(), title, body)
+	}()
+}
+
 func (s *Service) SetEventLookup(lookup EventLookup) {
 	s.eventLookup = lookup
 }
@@ -721,6 +738,7 @@ func (s *Service) markDone(videoID, finalName, storedCodec string) error {
 	tr.State = StateDone
 	tr.Error = ""
 	tr.TouchedAt = s.now()
+	s.notify("Downloaded", notifyLabel(tr))
 	return s.store.Save(*tr)
 }
 
@@ -743,11 +761,19 @@ func (s *Service) failRun(videoID, path string, cancelErr, runErr error) {
 	} else {
 		tr.State = StateFailed
 		tr.Error = runErr.Error()
+		s.notify("Download failed", notifyLabel(tr)+": "+tr.Error)
 	}
 	tr.FileName = ""
 	tr.StoredCodec = ""
 	tr.TouchedAt = s.now()
 	_ = s.store.Save(*tr)
+}
+
+func notifyLabel(tr *Track) string {
+	if tr.Artist != "" {
+		return tr.Artist + ": " + tr.Title
+	}
+	return tr.Title
 }
 
 func (s *Service) completeRun(videoID string) {

@@ -18,6 +18,9 @@ func TestArtistFromTitle(t *testing.T) {
 		{title: "Song Without Dash", want: ""},
 		{title: "Hyphenated-Title", want: ""},
 		{title: "Trailing dash -", want: ""},
+		{title: "Metallica: Nothing Else Matters", want: "Metallica"},
+		{title: "Band: Song - Live", want: "Band"},
+		{title: "Song Title:Nospace", want: ""},
 		{title: "  Spaced Artist  -  Song  ", want: "Spaced Artist"},
 	}
 	for _, tt := range tests {

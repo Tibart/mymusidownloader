@@ -14,6 +14,7 @@ import (
 	"mymusidownloader/internal/config"
 	"mymusidownloader/internal/downloader"
 	"mymusidownloader/internal/genre"
+	"mymusidownloader/internal/notify"
 	"mymusidownloader/internal/setlist"
 	"mymusidownloader/internal/track"
 	"mymusidownloader/internal/version"
@@ -56,6 +57,9 @@ func main() {
 		svc.SetEventLookup(setlist.Lookup(setlist.NewClient(cfg.SetlistFMKey)))
 	}
 	svc.SetGenreLookup(genre.Lookup(genre.NewClient(version.Current), svc.Genres))
+	if cfg.NtfyURL != "" && cfg.NtfyTopic != "" {
+		svc.SetNotifier(notify.New(cfg.NtfyURL, cfg.NtfyTopic).Send)
+	}
 
 	server, err := web.New(svc)
 	if err != nil {
