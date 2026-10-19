@@ -30,6 +30,7 @@ type Config struct {
 	SetlistFMKey  string `json:"setlistFmApiKey"`
 	NtfyURL       string `json:"ntfyUrl"`
 	NtfyTopic     string `json:"ntfyTopic"`
+	AppURL        string `json:"appUrl"`
 }
 
 func Load(path string) (Config, error) {

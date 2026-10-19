@@ -97,6 +97,7 @@ If status is `203/EXEC`, the binary is not executable or is the wrong CPU. `file
 | `ffmpegPath` | `/usr/bin/ffmpeg` | `ffmpeg` binary. |
 | `ntfyUrl` | `""` | Optional ntfy server, for example `http://TAILSCALE_IP:8090`. Empty turns notifications off. |
 | `ntfyTopic` | `""` | ntfy topic for notifications. Use a long random name. |
+| `appUrl` | `""` | Address of this app, for example `http://TAILSCALE_NAME:6874/`. Sent with each notification so tapping it opens the app. |
 | `setlistFmApiKey` | `""` | Optional setlist.fm API key. Empty turns event lookup off. Keep it out of git. |
 
 The sample values are for a local run. For the service, set `libraryPath` to `/srv/music` and `metadataPath` to `/var/lib/mymusidownloader`.

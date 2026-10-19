@@ -13,13 +13,15 @@ import (
 
 // Notifier posts messages to an ntfy topic.
 type Notifier struct {
-	BaseURL string
-	Topic   string
-	HTTP    *http.Client
+	BaseURL  string
+	Topic    string
+	ClickURL string
+	HTTP     *http.Client
 }
 
-func New(baseURL, topic string) Notifier {
-	return Notifier{BaseURL: strings.TrimRight(baseURL, "/"), Topic: topic, HTTP: &http.Client{Timeout: 10 * time.Second}}
+// New returns a Notifier. clickURL is opened when the user taps the message; empty means none.
+func New(baseURL, topic, clickURL string) Notifier {
+	return Notifier{BaseURL: strings.TrimRight(baseURL, "/"), Topic: topic, ClickURL: clickURL, HTTP: &http.Client{Timeout: 10 * time.Second}}
 }
 
 // Send posts body with the given title. A failure is logged and returned.
@@ -30,6 +32,9 @@ func (n Notifier) Send(ctx context.Context, title, body string) error {
 		return fmt.Errorf("build notification: %w", err)
 	}
 	req.Header.Set("Title", title)
+	if n.ClickURL != "" {
+		req.Header.Set("Click", n.ClickURL)
+	}
 	resp, err := n.HTTP.Do(req)
 	if err != nil {
 		log.Printf("notify %q: %v", title, err)

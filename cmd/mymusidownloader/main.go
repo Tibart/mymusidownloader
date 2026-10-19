@@ -58,7 +58,7 @@ func main() {
 	}
 	svc.SetGenreLookup(genre.Lookup(genre.NewClient(version.Current), svc.Genres))
 	if cfg.NtfyURL != "" && cfg.NtfyTopic != "" {
-		svc.SetNotifier(notify.New(cfg.NtfyURL, cfg.NtfyTopic).Send)
+		svc.SetNotifier(notify.New(cfg.NtfyURL, cfg.NtfyTopic, cfg.AppURL).Send)
 	}
 
 	server, err := web.New(svc)

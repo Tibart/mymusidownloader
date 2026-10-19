@@ -18,7 +18,7 @@ func TestSendPostsBodyWithTitleToTopic(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := New(srv.URL+"/", "musi-abc").Send(context.Background(), "Downloaded", "Band: Song"); err != nil {
+	if err := New(srv.URL+"/", "musi-abc", "").Send(context.Background(), "Downloaded", "Band: Song"); err != nil {
 		t.Fatal(err)
 	}
 	if gotPath != "/musi-abc" || gotTitle != "Downloaded" || gotBody != "Band: Song" {
@@ -31,7 +31,21 @@ func TestSendReturnsErrorOnServerFailure(t *testing.T) {
 		http.Error(w, "down", http.StatusServiceUnavailable)
 	}))
 	defer srv.Close()
-	if err := New(srv.URL, "t").Send(context.Background(), "x", "y"); err == nil {
+	if err := New(srv.URL, "t", "").Send(context.Background(), "x", "y"); err == nil {
 		t.Fatal("expected an error on 503")
+	}
+}
+
+func TestSendSetsClickHeaderToAppURL(t *testing.T) {
+	var click string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		click = r.Header.Get("Click")
+	}))
+	defer srv.Close()
+	if err := New(srv.URL, "t", "http://app.example:6874/").Send(context.Background(), "x", "y"); err != nil {
+		t.Fatal(err)
+	}
+	if click != "http://app.example:6874/" {
+		t.Fatalf("Click = %q", click)
 	}
 }
